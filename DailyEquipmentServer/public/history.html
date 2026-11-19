@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประวัติการตรวจสอบ - ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="main-header">
+        <div class="container header-content">
+            <div class="header-left">
+                <div class="factory-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+                        <path d="M22 22H2V10l7-3v4l7-3v4h6v10zM4 20h16v-6h-6v-3.17l-7 3V9.83l-3 1.29V20zm14-18h2v7h-2V2zm-4 2h2v5h-2V4z"/>
+                    </svg>
+                </div>
+                <div class="header-titles">
+                    <h1>ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</h1>
+                    <p>Daily Equipment Inspection System</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="current-date" id="headerCurrentDate">กำลังโหลดวันที่...</div>
+                <div class="user-role-badge">
+                    <span class="role-dot"></span> ผู้ใช้งานระบบ
+                </div>
+                <button type="button" class="btn-logout" onclick="showToast('ออกจากระบบเรียบร้อย', 'info')">ออกจากระบบ</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="container nav-list">
+            <a href="index.html" class="nav-item">ตรวจเช็กประจำวัน</a>
+            <a href="approval.html" class="nav-item">รายการรออนุมัติ</a>
+            <a href="history.html" class="nav-item active">ประวัติการตรวจสอบ</a>
+        </div>
+    </nav>
+
+    <main class="container main-container">
+        <!-- Dashboard Section -->
+        <section class="dashboard-section">
+            <div class="dashboard-grid-row1">
+                <div class="dash-card card-total-blue">
+                    <div class="dash-card-info">
+                        <span class="dash-label">รายการตรวจสอบทั้งหมด</span>
+                        <div class="dash-value" id="dashInspectedCount">0 / 24 <small>เครื่อง</small></div>
+                    </div>
+                    <div class="dash-card-icon-right bg-blue-icon">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                    </div>
+                </div>
+
+                <div class="dash-card card-uninspected-gray">
+                    <div class="dash-card-info">
+                        <span class="dash-label">ยังไม่ได้ตรวจสอบ</span>
+                        <div class="dash-value" id="dashUninspectedCount">24 / 24 <small>เครื่อง</small></div>
+                    </div>
+                    <div class="dash-card-icon-right bg-gray-icon">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid-row2">
+                <div class="dash-card card-normal-theme">
+                    <div class="dash-card-info">
+                        <span class="dash-label">รายการปกติ</span>
+                        <div class="dash-value text-green" id="dashNormalCount">0</div>
+                        <span class="dash-sub-label">Normal</span>
+                    </div>
+                    <div class="dash-card-icon-right circle-badge-green">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                    </div>
+                </div>
+
+                <div class="dash-card card-warning-theme">
+                    <div class="dash-card-info">
+                        <span class="dash-label">เฝ้าระวัง</span>
+                        <div class="dash-value text-orange" id="dashWarningCount">0</div>
+                        <span class="dash-sub-label">Warning</span>
+                    </div>
+                    <div class="dash-card-icon-right circle-badge-orange">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    </div>
+                </div>
+
+                <div class="dash-card card-abnormal-theme">
+                    <div class="dash-card-info">
+                        <span class="dash-label">ผิดปกติ</span>
+                        <div class="dash-value text-red" id="dashAbnormalCount">0</div>
+                        <span class="dash-sub-label">Abnormal</span>
+                    </div>
+                    <div class="dash-card-icon-right circle-badge-red">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ส่วนตัวกรองประวัติ -->
+        <section class="card-box filter-section">
+            <h3 class="box-title">ค้นหาและกรองประวัติการตรวจสอบ (อาคาร A และอาคาร B)</h3>
+            <div class="history-filter-grid">
+                <div class="form-group">
+                    <label for="specificDateFilter">1. เลือกวันที่เฉพาะ</label>
+                    <input type="date" id="specificDateFilter" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="rangeDaysFilter">2. เลือกช่วงเวลาย้อนหลัง</label>
+                    <select id="rangeDaysFilter" class="form-control">
+                        <option value="all">แสดงประวัติทั้งหมด</option>
+                        <option value="3">ย้อนหลัง 3 วัน</option>
+                        <option value="7">ย้อนหลัง 7 วัน</option>
+                        <option value="10">ย้อนหลัง 10 วัน</option>
+                        <option value="30">ย้อนหลัง 30 วัน</option>
+                    </select>
+                </div>
+
+                <div class="form-group btn-align-bottom">
+                    <button type="button" id="clearHistoryFilterBtn" class="btn btn-secondary">
+                        ล้างตัวกรอง
+                    </button>
+                </div>
+            </div>
+            <div class="filter-status-note" id="historyFilterSummary">
+                แสดงประวัติการตรวจสอบทั้งหมด
+            </div>
+        </section>
+
+        <section id="historyGroupsContainer" class="history-groups-wrapper"></section>
+    </main>
+
+    <!-- Modal ดูรายละเอียดประวัติ -->
+    <div id="historyDetailModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-header">
+                <h3>รายละเอียดบันทึกการตรวจสอบย้อนหลัง</h3>
+                <button type="button" class="modal-close-btn" id="closeHistoryModalBtn">&times;</button>
+            </div>
+            <div class="modal-body" id="historyModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="okHistoryModalBtn">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/history.js"></script>
+</body>
+</html>

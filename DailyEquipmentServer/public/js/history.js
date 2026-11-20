@@ -18,6 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeHistoryModalBtn = document.getElementById('closeHistoryModalBtn');
     const okHistoryModalBtn = document.getElementById('okHistoryModalBtn');
 
+    // ค่าเริ่มต้นเมื่อเปิดหน้า: แสดงเฉพาะวันนี้
+    rangeDaysFilter.value = '1';
+
     specificDateFilter.addEventListener('change', () => {
         if (specificDateFilter.value) rangeDaysFilter.value = 'all';
         renderHistory();
@@ -30,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     clearHistoryFilterBtn.addEventListener('click', () => {
         specificDateFilter.value = '';
-        rangeDaysFilter.value = 'all';
+        rangeDaysFilter.value = '1';
         renderHistory();
     });
 
@@ -58,7 +61,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const d = DEIStorage.parseLocalDate(dateKey);
                 return d >= start && d <= today;
             });
-            historyFilterSummary.textContent = `แสดงประวัติย้อนหลัง ${days} วัน`;
+            historyFilterSummary.textContent = days === 1
+                ? `แสดงประวัติการตรวจสอบของวันนี้`
+                : `แสดงประวัติย้อนหลัง ${days} วัน`;
         } else {
             historyFilterSummary.textContent = `แสดงประวัติการตรวจสอบทั้งหมด`;
         }

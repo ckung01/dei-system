@@ -8,7 +8,6 @@ app.use(express.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// เชื่อมต่อฐานข้อมูล MySQL (รองรับทั้ง localhost และโฮสจริง)
 const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
@@ -23,7 +22,145 @@ db.connect(err => {
     console.log('Connected to MySQL Database successfully!');
 });
 
-// 1. API ดึงข้อมูลทั้งหมด (แปลงชื่อฟิลด์ให้ตรงกับฝั่ง Frontend)
+// สมัครสมาชิก
+app.post('/api/auth/register', (req, res) => {
+    const { username, password, fullName, role } = req.body;
+    const allowedRoles = ['inspector', 'approver', 'admin'];
+    const safeRole = allowedRoles.includes(role) ? role : 'inspector';
+
+    if (!username || !password || !fullName) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+    }
+
+    db.query('SELECT id FROM users WHERE username = ?', [username.trim()], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length > 0) {
+            return res.status(409).json({ success: false, message: 'ชื่อผู้ใช้งานนี้ถูกใช้ไปแล้ว' });
+        }
+
+        const sql = 'INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)';
+        db.query(sql, [username.trim(), password, fullName.trim(), safeRole], (insertErr, result) => {
+            if (insertErr) return res.status(500).json({ success: false, message: insertErr.message });
+            res.json({
+                success: true,
+                user: { id: result.insertId, username: username.trim(), fullName: fullName.trim(), role: safeRole }
+            });
+        });
+    });
+});
+
+// เข้าสู่ระบบ
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
+    }
+
+    const sql = 'SELECT id, username, full_name, role FROM users WHERE username = ? AND password = ? LIMIT 1';
+    db.query(sql, [username.trim(), password], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(401).json({ success: false, message: 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง' });
+        }
+
+        const u = rows[0];
+        res.json({
+            success: true,
+            user: { id: u.id, username: u.username, fullName: u.full_name, role: u.role }
+        });
+    });
+});
+
+// เครื่องจักร
+app.get('/api/machines', (req, res) => {
+    db.query('SELECT * FROM machines ORDER BY code ASC', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows.map(r => ({ id: r.id, code: r.code, building: r.building, name: r.name })));
+    });
+});
+
+app.post('/api/machines', (req, res) => {
+    const { code, building, name } = req.body;
+    if (!code || !building || !name) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลเครื่องจักรให้ครบ' });
+    }
+    db.query('SELECT id FROM machines WHERE code = ?', [code.trim()], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length > 0) {
+            return res.status(409).json({ success: false, message: 'รหัสเครื่องจักรนี้มีอยู่แล้ว' });
+        }
+        db.query('INSERT INTO machines (code, building, name) VALUES (?, ?, ?)', [code.trim(), building.trim(), name.trim()], (insertErr, result) => {
+            if (insertErr) return res.status(500).json({ success: false, message: insertErr.message });
+            res.json({ success: true, id: result.insertId });
+        });
+    });
+});
+
+app.delete('/api/machines/:id', (req, res) => {
+    db.query('DELETE FROM machines WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true });
+    });
+});
+
+// คำถาม
+app.get('/api/questions', (req, res) => {
+    db.query('SELECT * FROM questions ORDER BY cat_code ASC, seq ASC, id ASC', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows.map(r => ({
+            id: r.id,
+            catCode: r.cat_code,
+            catClass: r.cat_class,
+            catName: r.cat_name,
+            seq: r.seq,
+            title: r.title,
+            hasMeasurement: Boolean(r.has_measurement),
+            unit: r.unit || '',
+            placeholder: r.placeholder || ''
+        })));
+    });
+});
+
+app.post('/api/questions', (req, res) => {
+    const { catCode, catName, seq, title, hasMeasurement, unit, placeholder } = req.body;
+    if (!catCode || !catName || !title) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกหมวดและหัวข้อคำถาม' });
+    }
+    const validCatCodes = ['01', '02', '03', '04'];
+    const safeCatCode = validCatCodes.includes(catCode) ? catCode : '04';
+    const catClass = `cat-${safeCatCode}`;
+
+    const sql = 'INSERT INTO questions (cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+    db.query(sql, [safeCatCode, catClass, catName.trim(), Number(seq) || 1, title.trim(), hasMeasurement ? 1 : 0, (unit || '').trim(), (placeholder || '').trim()], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+app.put('/api/questions/:id', (req, res) => {
+    const { catCode, catName, seq, title, hasMeasurement, unit, placeholder } = req.body;
+    if (!title) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกหัวข้อคำถาม' });
+    }
+    const validCatCodes = ['01', '02', '03', '04'];
+    const safeCatCode = validCatCodes.includes(catCode) ? catCode : '04';
+    const catClass = `cat-${safeCatCode}`;
+
+    const sql = 'UPDATE questions SET cat_code = ?, cat_class = ?, cat_name = ?, seq = ?, title = ?, has_measurement = ?, unit = ?, placeholder = ? WHERE id = ?';
+    db.query(sql, [safeCatCode, catClass, (catName || '').trim(), Number(seq) || 1, title.trim(), hasMeasurement ? 1 : 0, (unit || '').trim(), (placeholder || '').trim(), req.params.id], (err) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.delete('/api/questions/:id', (req, res) => {
+    db.query('DELETE FROM questions WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true });
+    });
+});
+
+// การตรวจเช็ก
 app.get('/api/inspections', (req, res) => {
     db.query('SELECT * FROM inspections ORDER BY inspection_date DESC, inspection_time DESC', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -50,7 +187,6 @@ app.get('/api/inspections', (req, res) => {
     });
 });
 
-// 2. API บันทึกหรืออัปเดตผลตรวจ
 app.post('/api/inspections', (req, res) => {
     const data = req.body;
     const itemsJson = JSON.stringify(data.items);
@@ -73,10 +209,8 @@ app.post('/api/inspections', (req, res) => {
             });
         }
     });
-
 });
 
-// 3. API อนุมัติรายการ
 app.put('/api/inspections/:id/approve', (req, res) => {
     const { id } = req.params;
     const { approverName, approvedDate, approvedTime } = req.body;

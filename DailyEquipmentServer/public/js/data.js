@@ -1,6 +1,17 @@
 let CACHED_MACHINES = [];
 let CACHED_QUESTIONS = [];
 
+function dedupeMachinesList(list) {
+    if (!Array.isArray(list)) return [];
+    const seenCodes = new Set();
+    return list.filter(m => {
+        const codeKey = String(m.code || '').trim().toUpperCase();
+        if (!codeKey || seenCodes.has(codeKey)) return false;
+        seenCodes.add(codeKey);
+        return true;
+    });
+}
+
 function groupQuestionsIntoCategories(questionsList) {
     if (!Array.isArray(questionsList) || questionsList.length === 0) return [];
     return [{
@@ -31,7 +42,7 @@ const DEIStorage = {
             const res = await fetch('/api/machines');
             const data = await res.json();
             if (Array.isArray(data)) {
-                CACHED_MACHINES = data;
+                CACHED_MACHINES = dedupeMachinesList(data);
             }
         } catch (e) {
             console.error('Error loading machines:', e);
@@ -56,15 +67,22 @@ const DEIStorage = {
     },
 
     getMachines() {
-        return CACHED_MACHINES;
+        return dedupeMachinesList(CACHED_MACHINES);
     },
 
     getMachinesByBuilding(b) {
-        return CACHED_MACHINES.filter(m => m.building === b);
+        const targetBuilding = String(b || '').trim();
+        const filtered = dedupeMachinesList(CACHED_MACHINES).filter(
+            m => String(m.building || '').trim() === targetBuilding
+        );
+        return dedupeMachinesList(filtered);
     },
 
     getMachineByCode(c) {
-        return CACHED_MACHINES.find(m => m.code === c) || null;
+        const targetCode = String(c || '').trim().toUpperCase();
+        return dedupeMachinesList(CACHED_MACHINES).find(
+            m => String(m.code || '').trim().toUpperCase() === targetCode
+        ) || null;
     },
 
     getQuestions() {
@@ -209,7 +227,8 @@ const DEIStorage = {
 
     async getTodayDashboardStats() {
         await this.loadMachines();
-        const totalMachines = CACHED_MACHINES.length || 24;
+        const uniqueMachines = dedupeMachinesList(CACHED_MACHINES);
+        const totalMachines = uniqueMachines.length || 24;
         const todayISO = this.getTodayISO();
         const inspections = await this.getInspections();
         const todayInspections = inspections.filter(i => String(i.inspectionDate || '').split('T')[0] === todayISO);

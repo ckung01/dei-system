@@ -85,7 +85,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const machines = DEIStorage.getMachinesByBuilding(b);
+        const rawMachines = DEIStorage.getMachinesByBuilding(b) || [];
+        const seenCodes = new Set();
+        const machines = rawMachines.filter(m => {
+            const codeKey = String(m.code || '').trim().toUpperCase();
+            if (!codeKey || seenCodes.has(codeKey)) return false;
+            seenCodes.add(codeKey);
+            return true;
+        });
+
         const todayISO = DEIStorage.getTodayISO();
 
         machineSelect.disabled = false;

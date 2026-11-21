@@ -1,10 +1,10 @@
 /**
  * Daily Equipment Inspection System - หน้าที่สำคัญ: ตรวจเช็กประจำวัน (index.html)
- * พร้อมระบบตรวจสอบเกณฑ์ตัวเลขมาตรฐานอัตโนมัติ (ฉบับแก้ไขสมบูรณ์)
+ * พร้อมระบบตรวจสอบเกณฑ์ตัวเลขมาตรฐานอัตโนมัติ และดึงคำถาม/เครื่องจักรจากฐานข้อมูลแบบไดนามิก
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
-    DEIStorage.init();
+    await DEIStorage.init();
     await DEIStorage.renderSharedHeaderAndDashboard();
 
     const buildingSelect = document.getElementById('buildingSelect');
@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentMachine = null;
     let checklistState = {};
 
-    // กำหนดช่วงเกณฑ์มาตรฐานตัวเลขที่สมเหตุสมผลสำหรับแต่ละข้อ (Normal Range)
     const MEASUREMENT_RANGES = {
         1: { min: 4.0, max: 8.0, name: 'แรงดันด้านขาดูด' },
         2: { min: 12.0, max: 18.0, name: 'แรงดันด้านจ่าย' },
@@ -28,6 +27,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         9: { min: 360.0, max: 400.0, name: 'แรงดันไฟฟ้า' },
         10: { min: 35.0, max: 55.0, name: 'กระแสไฟฟ้า' }
     };
+
+    function getActiveCategories() {
+        return DEIStorage.getChecklistCategories();
+    }
+
+    function getTotalQuestionsCount() {
+        return getActiveCategories().reduce((sum, cat) => sum + cat.items.length, 0);
+    }
 
     buildingSelect.addEventListener('change', async () => {
         const b = buildingSelect.value;
@@ -44,13 +51,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         machineSelect.disabled = false;
         machineSelect.innerHTML = `<option value="">-- เลือกเครื่องจักรในอาคาร ${b} (${machines.length} เครื่อง) --</option>`;
 
-        // ดึงรายการตรวจสอบทั้งหมดของวันนี้ครั้งเดียว เพื่อประสิทธิภาพและความถูกต้อง
         let todayInspections = [];
         try {
             const allInspections = await DEIStorage.getInspections();
             todayInspections = allInspections.filter(i => {
                 if (!i.inspectionDate) return false;
-                // ตัดสตริงเอาเฉพาะ YYYY-MM-DD เพื่อป้องกันปัญหารูปแบบเวลาเหลื่อมกัน
                 const dbDate = String(i.inspectionDate).split('T')[0];
                 return dbDate === todayISO;
             });
@@ -59,7 +64,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         machines.forEach(m => {
-            // เช็คจากรหัสเครื่องจักรว่ามีอยู่ในรายการที่ตรวจของวันนี้แล้วหรือยัง
             const isChecked = todayInspections.some(i => i.machineCode === m.code);
             const opt = document.createElement('option');
             opt.value = m.code;
@@ -82,9 +86,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     async function openForm(machine) {
+        await DEIStorage.loadQuestions();
+        const categories = getActiveCategories();
+        const totalQuestions = getTotalQuestionsCount();
         const todayISO = DEIStorage.getTodayISO();
 
-        // ค้นหาข้อมูลเดิมของวันนี้ด้วยการเทียบรหัสเครื่องและวันที่แบบปลอดภัย
+        const headerTitleEl = document.querySelector('.checklist-header-bar h3');
+        if (headerTitleEl) {
+            headerTitleEl.textContent = `รายการตรวจเช็กเครื่องจักรประจำวัน (${totalQuestions} รายการ)`;
+        }
+
         let existing = null;
         try {
             const allInspections = await DEIStorage.getInspections();
@@ -106,6 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const banner = document.getElementById('duplicateWarningBanner');
         const badge = document.getElementById('machineTodayStatusBadge');
 
+        categories.forEach(cat => {
+            cat.items.forEach(i => {
+                checklistState[i.id] = { status: '', measurementValue: '', remark: '' };
+            });
+        });
+
         if (existing) {
             banner.classList.remove('hidden');
             badge.textContent = 'ตรวจแล้ววันนี้';
@@ -114,11 +131,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (Array.isArray(existing.items)) {
                 existing.items.forEach(i => {
-                    checklistState[i.id] = {
-                        status: i.status || '',
-                        measurementValue: i.measurementValue || '',
-                        remark: i.remark || ''
-                    };
+                    if (checklistState[i.id]) {
+                        checklistState[i.id] = {
+                            status: i.status || '',
+                            measurementValue: i.measurementValue || '',
+                            remark: i.remark || ''
+                        };
+                    }
                 });
             }
             showToast('โหลดข้อมูลเดิมของวันนี้แล้ว', 'info');
@@ -127,12 +146,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             badge.textContent = 'ยังไม่ตรวจวันนี้';
             badge.classList.remove('checked');
             inspectorNameInput.value = '';
-
-            CHECKLIST_CATEGORIES.forEach(cat => {
-                cat.items.forEach(i => {
-                    checklistState[i.id] = { status: '', measurementValue: '', remark: '' };
-                });
-            });
         }
 
         renderChecklist();
@@ -142,8 +155,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderChecklist() {
+        const categories = getActiveCategories();
         checklistCategoriesContainer.innerHTML = '';
-        CHECKLIST_CATEGORIES.forEach(cat => {
+
+        categories.forEach(cat => {
             const card = document.createElement('div');
             card.className = `category-card ${cat.catClass}`;
 
@@ -161,7 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
                 const needRemark = st.status === 'warning' || st.status === 'abnormal';
 
-                let placeholderText = item.placeholder;
+                let placeholderText = item.placeholder || 'กรอกค่าตรวจวัด';
                 if (MEASUREMENT_RANGES[item.id]) {
                     const r = MEASUREMENT_RANGES[item.id];
                     placeholderText = `ปกติ ${r.min}-${r.max} ${item.unit}`;
@@ -256,7 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 checklistState[id].remark = `ค่าเกินเกณฑ์มาตรฐาน (${range.min}-${range.max})`;
                                 remarkInput.value = checklistState[id].remark;
                             }
-                            showToast(`⚠️ ค่า ${range.name} (${num}) อยู่นอกช่วงปกติ ระบบปรับเป็น "ผิดปกติ" อัตโนมัติ`, 'warning');
+                            showToast(`ค่า ${range.name} (${num}) อยู่นอกช่วงปกติ ระบบปรับเป็น "ผิดปกติ" อัตโนมัติ`, 'warning');
                         } else {
                             if (checklistState[id].status === '' || checklistState[id].status === 'abnormal') {
                                 checklistState[id].status = 'normal';
@@ -286,8 +301,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateProgress() {
         let c = 0;
         Object.values(checklistState).forEach(s => { if (s && s.status) c++; });
-        const counterEl = document.getElementById('checkedCountText');
-        if (counterEl) counterEl.textContent = c;
+        const total = getTotalQuestionsCount();
+        const progressPill = document.querySelector('.checklist-progress-pill');
+        if (progressPill) {
+            progressPill.innerHTML = `เลือกสถานะแล้ว: <strong id="checkedCountText">${c}</strong> / ${total} ข้อ`;
+        }
     }
 
     resetFormBtn.addEventListener('click', () => {
@@ -306,10 +324,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const inspector = inspectorNameInput.value.trim();
         if (!inspector) { showToast('กรุณากรอกชื่อช่างผู้ตรวจสอบ', 'error'); inspectorNameInput.focus(); return; }
 
+        const categories = getActiveCategories();
         const items = [];
         let normalCount = 0, warningCount = 0, abnormalCount = 0;
 
-        for (const cat of CHECKLIST_CATEGORIES) {
+        for (const cat of categories) {
             for (const item of cat.items) {
                 const st = checklistState[item.id];
                 if (!st || !st.status) { showToast(`กรุณาเลือกสถานะข้อ ${cat.catCode}-${item.seq}`, 'error'); return; }
@@ -344,8 +363,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         await DEIStorage.upsertInspection(record);
         await DEIStorage.renderSharedHeaderAndDashboard();
-
-        // รีเฟรชตัวเลือกอาคารเพื่ออัปเดตป้ายกำกับ [ตรวจแล้ววันนี้] ทันทีหลังบันทึก
         buildingSelect.dispatchEvent(new Event('change'));
 
         showToast('บันทึกผลการตรวจสอบสำเร็จ!', 'success');

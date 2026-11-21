@@ -24,17 +24,17 @@ db.connect(err => {
 
 const USERNAME_REGEX = /^[A-Za-z0-9._-]+$/;
 
-const DEFAULT_15_QUESTIONS = [
-    { seq: 1, title: 'ตรวจสอบแรงดันด้านขาดูด (Suction Pressure)', has_measurement: 1, unit: 'bar', placeholder: '8-12' },
-    { seq: 2, title: 'ตรวจสอบแรงดันด้านจ่าย (Discharge Pressure)', has_measurement: 1, unit: 'bar', placeholder: '8-12' },
+const BASE_15_QUESTIONS = [
+    { seq: 1, title: 'ตรวจสอบแรงดันด้านขาดูด (Suction Pressure)', has_measurement: 1, unit: 'bar', placeholder: '4-8' },
+    { seq: 2, title: 'ตรวจสอบแรงดันด้านจ่าย (Discharge Pressure)', has_measurement: 1, unit: 'bar', placeholder: '12-18' },
     { seq: 3, title: 'ตรวจสอบการรั่วซึมของสารทำความเย็น / น้ำมัน', has_measurement: 0, unit: '', placeholder: '' },
     { seq: 4, title: 'ตรวจสอบสภาพวาล์วและท่อทางเดิน', has_measurement: 0, unit: '', placeholder: '' },
-    { seq: 5, title: 'ตรวจสอบอุณหภูมิน้ำเข้า (Inlet Water Temp)', has_measurement: 1, unit: '°C', placeholder: '8-12' },
-    { seq: 6, title: 'ตรวจสอบอุณหภูมิน้ำออก (Outlet Water Temp)', has_measurement: 1, unit: '°C', placeholder: '8-12' },
+    { seq: 5, title: 'ตรวจสอบอุณหภูมิน้ำเข้า (Inlet Water Temp)', has_measurement: 1, unit: '°C', placeholder: '10-15' },
+    { seq: 6, title: 'ตรวจสอบอุณหภูมิน้ำออก (Outlet Water Temp)', has_measurement: 1, unit: '°C', placeholder: '5-9' },
     { seq: 7, title: 'ตรวจสอบระดับน้ำและสภาพคอยล์เย็น/คอยล์ร้อน', has_measurement: 0, unit: '', placeholder: '' },
     { seq: 8, title: 'ตรวจสอบการทำงานของพัดลมระบายความร้อน', has_measurement: 0, unit: '', placeholder: '' },
-    { seq: 9, title: 'ตรวจสอบแรงดันไฟฟ้า (Voltage)', has_measurement: 1, unit: 'V', placeholder: '8-12' },
-    { seq: 10, title: 'ตรวจสอบกระแสไฟฟ้า (Current)', has_measurement: 1, unit: 'A', placeholder: '8-12' },
+    { seq: 9, title: 'ตรวจสอบแรงดันไฟฟ้า (Voltage)', has_measurement: 1, unit: 'V', placeholder: '360-400' },
+    { seq: 10, title: 'ตรวจสอบกระแสไฟฟ้า (Current)', has_measurement: 1, unit: 'A', placeholder: '35-55' },
     { seq: 11, title: 'ตรวจสอบสายไฟ ขั้วต่อ และตู้ควบคุมไฟฟ้า', has_measurement: 0, unit: '', placeholder: '' },
     { seq: 12, title: 'ตรวจสอบสัญญาณแจ้งเตือนและไฟแสดงสถานะหน้าตู้', has_measurement: 0, unit: '', placeholder: '' },
     { seq: 13, title: 'ตรวจสอบความผิดปกติของเสียงและการสั่นสะเทือน', has_measurement: 0, unit: '', placeholder: '' },
@@ -69,43 +69,29 @@ async function sendVerificationEmail(toEmail, code, fullName) {
     return { sentViaEmail: false };
 }
 
-function seedDefaultQuestionsForMachine(machineCode, callback) {
+function seedBase15QuestionsForMachine(machineCode, callback) {
     db.query('SELECT COUNT(*) AS cnt FROM machine_questions WHERE machine_code = ?', [machineCode], (cntErr, cntRows) => {
         if (cntErr) return callback(cntErr);
         if (cntRows[0] && cntRows[0].cnt > 0) return callback(null);
 
-        db.query('SELECT * FROM questions ORDER BY seq ASC, id ASC', (qErr, qRows) => {
-            if (qErr) return callback(qErr);
+        const values = BASE_15_QUESTIONS.map(item => [
+            machineCode,
+            '01',
+            'cat-01',
+            'รายการตรวจสอบเครื่องจักรประจำวัน',
+            item.seq,
+            item.title,
+            item.has_measurement,
+            item.unit,
+            item.placeholder
+        ]);
 
-            const sourceList = (Array.isArray(qRows) && qRows.length > 0)
-                ? qRows.map((q, idx) => ({
-                    seq: idx + 1,
-                    title: q.title,
-                    has_measurement: q.has_measurement ? 1 : 0,
-                    unit: q.unit || '',
-                    placeholder: q.placeholder || '8-12'
-                }))
-                : DEFAULT_15_QUESTIONS;
-
-            const values = sourceList.map(item => [
-                machineCode,
-                '01',
-                'cat-01',
-                'รายการตรวจสอบเครื่องจักรประจำวัน',
-                item.seq,
-                item.title,
-                item.has_measurement,
-                item.unit,
-                item.placeholder
-            ]);
-
-            const insertSql = `
-                INSERT INTO machine_questions
-                (machine_code, cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder)
-                VALUES ?
-            `;
-            db.query(insertSql, [values], callback);
-        });
+        const insertSql = `
+            INSERT INTO machine_questions
+            (machine_code, cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder)
+            VALUES ?
+        `;
+        db.query(insertSql, [values], callback);
     });
 }
 
@@ -380,7 +366,7 @@ app.post('/api/machines', (req, res) => {
         db.query('INSERT INTO machines (code, building, name) VALUES (?, ?, ?)', [cleanCode, cleanBuilding, cleanName], (insertErr, result) => {
             if (insertErr) return res.status(500).json({ success: false, message: insertErr.message });
 
-            seedDefaultQuestionsForMachine(cleanCode, (qErr) => {
+            seedBase15QuestionsForMachine(cleanCode, (qErr) => {
                 if (qErr) return res.status(500).json({ success: false, message: qErr.message });
                 res.json({ success: true, id: result.insertId });
             });
@@ -403,7 +389,7 @@ app.delete('/api/machines/:id', (req, res) => {
     });
 });
 
-// คำถามแยกตามเครื่องจักร
+// คำถามแยกตามเครื่องจักร (15 ข้อพื้นฐานเสมอถ้ายังไม่เพิ่ม/ลบ)
 app.get('/api/questions', (req, res) => {
     const machineCode = String(req.query.machineCode || '').trim();
 
@@ -413,15 +399,15 @@ app.get('/api/questions', (req, res) => {
         catCode: r.cat_code || '01',
         catClass: r.cat_class || 'cat-01',
         catName: r.cat_name || 'รายการตรวจสอบเครื่องจักรประจำวัน',
-        seq: r.seq || (idx + 1),
+        seq: idx + 1,
         title: r.title,
         hasMeasurement: Boolean(r.has_measurement),
         unit: r.unit || '',
-        placeholder: r.placeholder || '8-12'
+        placeholder: r.placeholder || ''
     }));
 
     if (!machineCode) {
-        return res.json(DEFAULT_15_QUESTIONS.map(q => ({
+        return res.json(BASE_15_QUESTIONS.map(q => ({
             id: q.seq,
             machineCode: '',
             catCode: '01',
@@ -441,7 +427,7 @@ app.get('/api/questions', (req, res) => {
             return res.json(mapRows(rows));
         }
 
-        seedDefaultQuestionsForMachine(machineCode, (seedErr) => {
+        seedBase15QuestionsForMachine(machineCode, (seedErr) => {
             if (seedErr) return res.status(500).json({ error: seedErr.message });
             db.query('SELECT * FROM machine_questions WHERE machine_code = ? ORDER BY seq ASC, id ASC', [machineCode], (afterErr, afterRows) => {
                 if (afterErr) return res.status(500).json({ error: afterErr.message });
@@ -451,7 +437,7 @@ app.get('/api/questions', (req, res) => {
     });
 });
 
-// เพิ่มคำถาม: รันเลขข้อถัดไปอัตโนมัติ (เช่น ข้อ 16)
+// เพิ่มคำถาม: รันเลขข้อถัดไปอัตโนมัติ (เช่น ข้อ 16) เฉพาะเครื่องที่เลือก
 app.post('/api/questions', (req, res) => {
     const { machineCode, title, hasMeasurement, unit, placeholder } = req.body;
     const cleanMachineCode = String(machineCode || '').trim();
@@ -459,13 +445,13 @@ app.post('/api/questions', (req, res) => {
         return res.status(400).json({ success: false, message: 'กรุณาเลือกเครื่องจักรและกรอกหัวข้อคำถาม' });
     }
 
-    seedDefaultQuestionsForMachine(cleanMachineCode, (seedErr) => {
+    seedBase15QuestionsForMachine(cleanMachineCode, (seedErr) => {
         if (seedErr) return res.status(500).json({ success: false, message: seedErr.message });
 
-        db.query('SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM machine_questions WHERE machine_code = ?', [cleanMachineCode], (maxErr, maxRows) => {
-            if (maxErr) return res.status(500).json({ success: false, message: maxErr.message });
+        db.query('SELECT COUNT(*) AS totalCount FROM machine_questions WHERE machine_code = ?', [cleanMachineCode], (cntErr, cntRows) => {
+            if (cntErr) return res.status(500).json({ success: false, message: cntErr.message });
 
-            const nextSeq = Number(maxRows[0]?.maxSeq || 0) + 1;
+            const nextSeq = Number(cntRows[0]?.totalCount || 0) + 1;
             const sql = `
                 INSERT INTO machine_questions
                 (machine_code, cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder)
@@ -480,7 +466,7 @@ app.post('/api/questions', (req, res) => {
                 title.trim(),
                 hasMeasurement ? 1 : 0,
                 (unit || '').trim(),
-                (placeholder || '8-12').trim()
+                (placeholder || '').trim()
             ], (err, result) => {
                 if (err) return res.status(500).json({ success: false, message: err.message });
                 res.json({ success: true, id: result.insertId, seq: nextSeq });
@@ -489,7 +475,7 @@ app.post('/api/questions', (req, res) => {
     });
 });
 
-// แก้ไขคำถาม
+// แก้ไขคำถามเฉพาะข้อที่เลือก (ข้ออื่นไม่เปลี่ยน)
 app.put('/api/questions/:id', (req, res) => {
     const { title, hasMeasurement, unit, placeholder } = req.body;
     if (!title) {
@@ -501,7 +487,7 @@ app.put('/api/questions/:id', (req, res) => {
         title.trim(),
         hasMeasurement ? 1 : 0,
         (unit || '').trim(),
-        (placeholder || '8-12').trim(),
+        (placeholder || '').trim(),
         req.params.id
     ], (err) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
@@ -509,7 +495,7 @@ app.put('/api/questions/:id', (req, res) => {
     });
 });
 
-// ลบคำถาม: จัดลำดับเลขข้อใหม่ให้เรียงต่อกันอัตโนมัติ (เช่น ลบข้อ 1 แล้วข้อ 2 เป็นข้อ 1)
+// ลบคำถามและรันเลขข้อใหม่ (ลบข้อ 1 แล้วข้อ 2 ขยับเป็นข้อ 1)
 app.delete('/api/questions/:id', (req, res) => {
     db.query('SELECT machine_code FROM machine_questions WHERE id = ?', [req.params.id], (selErr, selRows) => {
         if (selErr) return res.status(500).json({ success: false, message: selErr.message });

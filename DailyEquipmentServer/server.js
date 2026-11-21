@@ -23,7 +23,6 @@ db.connect(err => {
 });
 
 async function sendVerificationEmail(toEmail, code, fullName) {
-    // รองรับส่งอีเมลจริงหากตั้งค่า SMTP_HOST, SMTP_USER, SMTP_PASS ใน Environment Variables
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
         try {
             const nodemailer = require('nodemailer');
@@ -50,7 +49,7 @@ async function sendVerificationEmail(toEmail, code, fullName) {
     return { sentViaEmail: false };
 }
 
-// สมัครสมาชิก (ห้ามซ้ำทั้ง username และ email -> 1 อีเมลใช้ได้ 1 ยูสเซอร์)
+// สมัครสมาชิก (สร้างสถานะเป็น 'pending' รอผู้ดูแลระบบอนุมัติ)
 app.post('/api/auth/register', (req, res) => {
     const { username, email, password, fullName, role } = req.body;
     const allowedRoles = ['inspector', 'approver', 'admin'];
@@ -77,7 +76,10 @@ app.post('/api/auth/register', (req, res) => {
             }
         }
 
-        const sql = 'INSERT INTO users (username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?)';
+        const sql = `
+            INSERT INTO users (username, email, password, full_name, role, approval_status)
+            VALUES (?, ?, ?, ?, ?, 'pending')
+        `;
         db.query(sql, [cleanUsername, cleanEmail, password, fullName.trim(), safeRole], (insertErr, result) => {
             if (insertErr) {
                 if (insertErr.code === 'ER_DUP_ENTRY') {
@@ -92,21 +94,59 @@ app.post('/api/auth/register', (req, res) => {
                     username: cleanUsername,
                     email: cleanEmail,
                     fullName: fullName.trim(),
-                    role: safeRole
+                    role: safeRole,
+                    approvalStatus: 'pending'
                 }
             });
         });
     });
 });
 
-// เข้าสู่ระบบ
+// ตรวจสอบสถานะการอนุมัติของผู้ใช้ที่เพิ่งสมัคร (ใช้สำหรับหน้าโหลดรอ 1-2 นาที)
+app.get('/api/auth/approval-status', (req, res) => {
+    const username = String(req.query.username || '').trim();
+    const email = String(req.query.email || '').trim().toLowerCase();
+
+    if (!username && !email) {
+        return res.status(400).json({ success: false, message: 'กรุณาระบุ username หรือ email' });
+    }
+
+    const sql = `
+        SELECT id, username, email, full_name, role, approval_status
+        FROM users
+        WHERE username = ? OR LOWER(email) = ?
+        LIMIT 1
+    `;
+    db.query(sql, [username, email], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน' });
+        }
+
+        const u = rows[0];
+        res.json({
+            success: true,
+            approvalStatus: u.approval_status || 'pending',
+            user: {
+                id: u.id,
+                username: u.username,
+                email: u.email,
+                fullName: u.full_name,
+                role: u.role,
+                approvalStatus: u.approval_status || 'pending'
+            }
+        });
+    });
+});
+
+// เข้าสู่ระบบ (ต้องได้รับการอนุมัติจากผู้ดูแลระบบก่อน)
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
         return res.status(400).json({ success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
     }
 
-    const sql = 'SELECT id, username, email, full_name, role FROM users WHERE username = ? AND password = ? LIMIT 1';
+    const sql = 'SELECT id, username, email, full_name, role, approval_status FROM users WHERE username = ? AND password = ? LIMIT 1';
     db.query(sql, [username.trim(), password], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
         if (rows.length === 0) {
@@ -114,6 +154,14 @@ app.post('/api/auth/login', (req, res) => {
         }
 
         const u = rows[0];
+        if ((u.approval_status || 'pending') !== 'approved') {
+            return res.status(403).json({
+                success: false,
+                approvalStatus: u.approval_status || 'pending',
+                message: 'บัญชีนี้ยังรออนุมัติจากผู้ดูแลระบบ กรุณารอสักครู่จนกว่าจะได้รับการอนุมัติ'
+            });
+        }
+
         res.json({
             success: true,
             user: {
@@ -121,9 +169,39 @@ app.post('/api/auth/login', (req, res) => {
                 username: u.username,
                 email: u.email,
                 fullName: u.full_name,
-                role: u.role
+                role: u.role,
+                approvalStatus: u.approval_status
             }
         });
+    });
+});
+
+// สำหรับผู้ดูแลระบบ: ดูรายชื่อผู้ใช้งานทั้งหมด
+app.get('/api/admin/users', (req, res) => {
+    const sql = 'SELECT id, username, email, full_name, role, approval_status, created_at FROM users ORDER BY id DESC';
+    db.query(sql, (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json(rows.map(r => ({
+            id: r.id,
+            username: r.username,
+            email: r.email,
+            fullName: r.full_name,
+            role: r.role,
+            approvalStatus: r.approval_status || 'pending',
+            createdAt: r.created_at
+        })));
+    });
+});
+
+// สำหรับผู้ดูแลระบบ: กดอนุมัติผู้ใช้งาน
+app.put('/api/admin/users/:id/approve', (req, res) => {
+    const sql = "UPDATE users SET approval_status = 'approved' WHERE id = ?";
+    db.query(sql, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบผู้ใช้งานที่ต้องการอนุมัติ' });
+        }
+        res.json({ success: true });
     });
 });
 

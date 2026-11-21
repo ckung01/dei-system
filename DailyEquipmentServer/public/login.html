@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ / สมัครสมาชิก - ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .auth-wrapper {
+            max-width: 480px;
+            margin: 36px auto;
+            padding: 0 16px;
+        }
+        .auth-card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .auth-header h2 {
+            margin: 0 0 6px;
+            font-size: 1.35rem;
+            color: #0f172a;
+        }
+        .auth-header p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .auth-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .auth-tab-btn {
+            border: none;
+            background: transparent;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: 'Prompt', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            color: #475569;
+        }
+        .auth-tab-btn.active {
+            background: #ffffff;
+            color: #1d4ed8;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+        }
+        .auth-form .form-group {
+            margin-bottom: 14px;
+        }
+        .auth-submit-btn {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            font-size: 1rem;
+        }
+        .forgot-link-wrap {
+            text-align: right;
+            margin-top: 6px;
+        }
+        .link-btn {
+            background: none;
+            border: none;
+            color: #1d4ed8;
+            font-family: 'Prompt', sans-serif;
+            font-size: 0.88rem;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+        }
+        .auth-msg {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            text-align: center;
+            min-height: 20px;
+            line-height: 1.5;
+        }
+        .code-hint-box {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            color: #1e40af;
+            font-size: 0.88rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="container header-content">
+            <div class="header-left">
+                <div class="factory-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+                        <path d="M22 22H2V10l7-3v4l7-3v4h6v10zM4 20h16v-6h-6v-3.17l-7 3V9.83l-3 1.29V20zm14-18h2v7h-2V2zm-4 2h2v5h-2V4z"/>
+                    </svg>
+                </div>
+                <div class="header-titles">
+                    <h1>ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</h1>
+                    <p>Daily Equipment Inspection System</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header" id="authHeaderBox">
+                <h2 id="authTitle">เข้าสู่ระบบ</h2>
+                <p id="authSubtitle">กรอกชื่อผู้ใช้งานและรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
+            </div>
+
+            <div class="auth-tabs" id="authTabsBox">
+                <button type="button" class="auth-tab-btn active" id="tabLoginBtn">เข้าสู่ระบบ</button>
+                <button type="button" class="auth-tab-btn" id="tabRegisterBtn">สมัครสมาชิก</button>
+            </div>
+
+            <!-- 1. ฟอร์มเข้าสู่ระบบ (ไม่มีช่องเลือกสิทธิ์ 1-3) -->
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="loginUsername">ชื่อผู้ใช้งาน (Username) <span class="required">*</span></label>
+                    <input type="text" id="loginUsername" class="form-control" placeholder="กรอกชื่อผู้ใช้งาน" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">รหัสผ่าน (Password) <span class="required">*</span></label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="กรอกรหัสผ่าน" required>
+                    <div class="forgot-link-wrap">
+                        <button type="button" class="link-btn" id="goForgotBtn">ลืมรหัสผ่าน?</button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary auth-submit-btn">เข้าสู่ระบบ</button>
+                <div id="loginMsg" class="auth-msg"></div>
+            </form>
+
+            <!-- 2. ฟอร์มสมัครสมาชิก -->
+            <form id="registerForm" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="regFullName">ชื่อ-นามสกุล <span class="required">*</span></label>
+                    <input type="text" id="regFullName" class="form-control" placeholder="เช่น กิตติพงษ์ รุ่งเรือง" required>
+                </div>
+                <div class="form-group">
+                    <label for="regUsername">ชื่อผู้ใช้งาน (ตั้งเอง ห้ามซ้ำ) <span class="required">*</span></label>
+                    <input type="text" id="regUsername" class="form-control" placeholder="ตั้งชื่อผู้ใช้งาน" required>
+                </div>
+                <div class="form-group">
+                    <label for="regEmail">อีเมล (1 อีเมลใช้ได้ 1 ยูสเซอร์) <span class="required">*</span></label>
+                    <input type="email" id="regEmail" class="form-control" placeholder="เช่น name@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">ตั้งรหัสผ่าน <span class="required">*</span></label>
+                    <input type="password" id="regPassword" class="form-control" placeholder="ตั้งรหัสผ่าน" required>
+                </div>
+                <div class="form-group">
+                    <label for="regRole">เลือกสิทธิ์ผู้ใช้งาน <span class="required">*</span></label>
+                    <select id="regRole" class="form-control" required>
+                        <option value="inspector">1. ผู้ตรวจสอบ</option>
+                        <option value="approver">2. ผู้อนุมัติ</option>
+                        <option value="admin">3. ผู้ดูแลระบบ</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-success auth-submit-btn">สมัครสมาชิก</button>
+                <div id="registerMsg" class="auth-msg"></div>
+            </form>
+
+            <!-- 3. หน้าลืมรหัสผ่าน: ใส่อีเมลเพื่อส่งรหัสยืนยัน และกรอกรหัสยืนยัน -->
+            <form id="forgotForm" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="forgotEmail">อีเมลที่ใช้สมัครสมาชิก <span class="required">*</span></label>
+                    <input type="email" id="forgotEmail" class="form-control" placeholder="กรอกอีเมลของคุณ" required>
+                    <button type="button" id="sendCodeBtn" class="btn btn-primary auth-submit-btn" style="margin-top:10px;">
+                        ส่งรหัสยืนยันไปที่อีเมล
+                    </button>
+                </div>
+                <div id="sendCodeMsg" class="auth-msg"></div>
+                <div id="codePreviewBox" class="code-hint-box hidden"></div>
+
+                <div class="form-group" style="margin-top:14px;">
+                    <label for="verifyCodeInput">รหัสยืนยันที่ส่งไปทางอีเมล <span class="required">*</span></label>
+                    <input type="text" id="verifyCodeInput" class="form-control" placeholder="กรอกรหัสยืนยัน 6 หลัก" maxlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-success auth-submit-btn">ถัดไป: ตั้งรหัสผ่านใหม่</button>
+                <div style="text-align:center;margin-top:12px;">
+                    <button type="button" class="link-btn" id="backToLoginFromForgotBtn">กลับไปหน้าเข้าสู่ระบบ</button>
+                </div>
+                <div id="forgotErrorMsg" class="auth-msg"></div>
+            </form>
+
+            <!-- 4. หน้าตั้งรหัสผ่านใหม่ + ยืนยันรหัสผ่านใหม่ -->
+            <form id="resetPasswordForm" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="newPasswordInput">รหัสผ่านใหม่ <span class="required">*</span></label>
+                    <input type="password" id="newPasswordInput" class="form-control" placeholder="กรอกรหัสผ่านใหม่" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPasswordInput">ยืนยันรหัสผ่านใหม่ <span class="required">*</span></label>
+                    <input type="password" id="confirmPasswordInput" class="form-control" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง" required>
+                </div>
+                <button type="submit" class="btn btn-success auth-submit-btn">ยืนยันรหัสผ่านใหม่</button>
+                <div id="resetPasswordMsg" class="auth-msg"></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        (function () {
+            const prefill = DEIAuth.consumePrefillLogin();
+            const existingUser = DEIAuth.getUser();
+            if (existingUser && !prefill) {
+                window.location.href = DEIAuth.getHomePageByRole(existingUser.role);
+                return;
+            }
+
+            const authTitle = document.getElementById('authTitle');
+            const authSubtitle = document.getElementById('authSubtitle');
+            const authTabsBox = document.getElementById('authTabsBox');
+            const tabLoginBtn = document.getElementById('tabLoginBtn');
+            const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const forgotForm = document.getElementById('forgotForm');
+            const resetPasswordForm = document.getElementById('resetPasswordForm');
+
+            const loginUsername = document.getElementById('loginUsername');
+            const loginPassword = document.getElementById('loginPassword');
+            const loginMsg = document.getElementById('loginMsg');
+            const registerMsg = document.getElementById('registerMsg');
+            const sendCodeMsg = document.getElementById('sendCodeMsg');
+            const codePreviewBox = document.getElementById('codePreviewBox');
+            const forgotErrorMsg = document.getElementById('forgotErrorMsg');
+            const resetPasswordMsg = document.getElementById('resetPasswordMsg');
+
+            let verifiedEmail = '';
+            let verifiedCode = '';
+
+            function showView(mode) {
+                loginForm.classList.add('hidden');
+                registerForm.classList.add('hidden');
+                forgotForm.classList.add('hidden');
+                resetPasswordForm.classList.add('hidden');
+
+                loginMsg.textContent = '';
+                registerMsg.textContent = '';
+                sendCodeMsg.textContent = '';
+                forgotErrorMsg.textContent = '';
+                resetPasswordMsg.textContent = '';
+
+                if (mode === 'login') {
+                    authTabsBox.classList.remove('hidden');
+                    tabLoginBtn.classList.add('active');
+                    tabRegisterBtn.classList.remove('active');
+                    authTitle.textContent = 'เข้าสู่ระบบ';
+                    authSubtitle.textContent = 'กรอกชื่อผู้ใช้งานและรหัสผ่านเพื่อเข้าใช้งานระบบ';
+                    loginForm.classList.remove('hidden');
+                } else if (mode === 'register') {
+                    authTabsBox.classList.remove('hidden');
+                    tabRegisterBtn.classList.add('active');
+                    tabLoginBtn.classList.remove('active');
+                    authTitle.textContent = 'สมัครสมาชิก';
+                    authSubtitle.textContent = 'กรอกข้อมูลผู้ใช้งานและเลือกสิทธิ์ 1 ใน 3 ข้อ';
+                    registerForm.classList.remove('hidden');
+                } else if (mode === 'forgot') {
+                    authTabsBox.classList.add('hidden');
+                    authTitle.textContent = 'ลืมรหัสผ่าน';
+                    authSubtitle.textContent = 'ใส่อีเมลเพื่อรับรหัสยืนยัน และกรอกรหัสยืนยันที่ได้รับ';
+                    forgotForm.classList.remove('hidden');
+                } else if (mode === 'reset') {
+                    authTabsBox.classList.add('hidden');
+                    authTitle.textContent = 'ตั้งรหัสผ่านใหม่';
+                    authSubtitle.textContent = 'กรอกรหัสผ่านใหม่และยืนยันรหัสผ่านใหม่อีกครั้ง';
+                    resetPasswordForm.classList.remove('hidden');
+                }
+            }
+
+            if (prefill && prefill.username) {
+                showView('login');
+                loginUsername.value = prefill.username;
+                loginPassword.value = prefill.password || '';
+                loginMsg.style.color = '#16a34a';
+                loginMsg.textContent = 'เปลี่ยนรหัสผ่านสำเร็จ! กรอก/ตรวจสอบข้อมูลแล้วกดเข้าสู่ระบบได้เลย';
+            }
+
+            tabLoginBtn.addEventListener('click', () => showView('login'));
+            tabRegisterBtn.addEventListener('click', () => showView('register'));
+            document.getElementById('goForgotBtn').addEventListener('click', () => showView('forgot'));
+            document.getElementById('backToLoginFromForgotBtn').addEventListener('click', () => showView('login'));
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                loginMsg.style.color = '#475569';
+                loginMsg.textContent = 'กำลังตรวจสอบข้อมูล...';
+
+                try {
+                    const res = await DEIAuth.login(loginUsername.value.trim(), loginPassword.value);
+                    if (res.success && res.user) {
+                        loginMsg.style.color = '#16a34a';
+                        loginMsg.textContent = 'เข้าสู่ระบบสำเร็จ กำลังเข้าสู่หน้าหลัก...';
+                        setTimeout(() => {
+                            window.location.href = DEIAuth.getHomePageByRole(res.user.role);
+                        }, 350);
+                    } else {
+                        loginMsg.style.color = '#dc2626';
+                        loginMsg.textContent = res.message || 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง';
+                    }
+                } catch (err) {
+                    loginMsg.style.color = '#dc2626';
+                    loginMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                registerMsg.style.color = '#475569';
+                registerMsg.textContent = 'กำลังบันทึกข้อมูลสมัครสมาชิก...';
+
+                const fullName = document.getElementById('regFullName').value.trim();
+                const username = document.getElementById('regUsername').value.trim();
+                const email = document.getElementById('regEmail').value.trim().toLowerCase();
+                const password = document.getElementById('regPassword').value;
+                const role = document.getElementById('regRole').value;
+
+                try {
+                    const res = await DEIAuth.register({ fullName, username, email, password, role });
+                    if (res.success) {
+                        registerMsg.style.color = '#16a34a';
+                        registerMsg.textContent = 'สมัครสมาชิกสำเร็จ! กำลังพาไปหน้าเข้าสู่ระบบ...';
+                        setTimeout(() => {
+                            loginUsername.value = username;
+                            loginPassword.value = '';
+                            showView('login');
+                        }, 700);
+                    } else {
+                        registerMsg.style.color = '#dc2626';
+                        registerMsg.textContent = res.message || 'สมัครสมาชิกไม่สำเร็จ';
+                    }
+                } catch (err) {
+                    registerMsg.style.color = '#dc2626';
+                    registerMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+
+            document.getElementById('sendCodeBtn').addEventListener('click', async () => {
+                const emailVal = document.getElementById('forgotEmail').value.trim().toLowerCase();
+                if (!emailVal) {
+                    sendCodeMsg.style.color = '#dc2626';
+                    sendCodeMsg.textContent = 'กรุณากรอกอีเมลก่อนกดส่งรหัสยืนยัน';
+                    return;
+                }
+
+                sendCodeMsg.style.color = '#475569';
+                sendCodeMsg.textContent = 'กำลังส่งรหัสยืนยันไปยังอีเมล...';
+                codePreviewBox.classList.add('hidden');
+
+                try {
+                    const res = await DEIAuth.requestResetCode(emailVal);
+                    if (res.success) {
+                        sendCodeMsg.style.color = '#16a34a';
+                        sendCodeMsg.textContent = res.message;
+                        if (res.previewCode) {
+                            codePreviewBox.classList.remove('hidden');
+                            codePreviewBox.innerHTML = `รหัสยืนยันสำหรับทดสอบ: <strong>${res.previewCode}</strong>`;
+                            document.getElementById('verifyCodeInput').value = res.previewCode;
+                        }
+                    } else {
+                        sendCodeMsg.style.color = '#dc2626';
+                        sendCodeMsg.textContent = res.message || 'ไม่พบอีเมลนี้ในระบบ';
+                    }
+                } catch (err) {
+                    sendCodeMsg.style.color = '#dc2626';
+                    sendCodeMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+
+            forgotForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const emailVal = document.getElementById('forgotEmail').value.trim().toLowerCase();
+                const codeVal = document.getElementById('verifyCodeInput').value.trim();
+
+                if (!emailVal || !codeVal) {
+                    forgotErrorMsg.style.color = '#dc2626';
+                    forgotErrorMsg.textContent = 'กรุณากรอกอีเมลและรหัสยืนยันให้ครบ';
+                    return;
+                }
+
+                verifiedEmail = emailVal;
+                verifiedCode = codeVal;
+                document.getElementById('newPasswordInput').value = '';
+                document.getElementById('confirmPasswordInput').value = '';
+                showView('reset');
+            });
+
+            resetPasswordForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newPass = document.getElementById('newPasswordInput').value;
+                const confirmPass = document.getElementById('confirmPasswordInput').value;
+
+                if (newPass !== confirmPass) {
+                    resetPasswordMsg.style.color = '#dc2626';
+                    resetPasswordMsg.textContent = 'รหัสผ่านใหม่กับยืนยันรหัสผ่านใหม่ไม่ตรงกัน';
+                    return;
+                }
+
+                resetPasswordMsg.style.color = '#475569';
+                resetPasswordMsg.textContent = 'กำลังบันทึกรหัสผ่านใหม่...';
+
+                try {
+                    const res = await DEIAuth.confirmNewPassword(verifiedEmail, verifiedCode, newPass);
+                    if (res.success) {
+                        DEIAuth.setPrefillLogin(res.username, res.password);
+                        resetPasswordMsg.style.color = '#16a34a';
+                        resetPasswordMsg.textContent = 'ยืนยันรหัสผ่านใหม่สำเร็จ! กำลังกลับไปหน้าเข้าสู่ระบบ...';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 600);
+                    } else {
+                        resetPasswordMsg.style.color = '#dc2626';
+                        resetPasswordMsg.textContent = res.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้';
+                    }
+                } catch (err) {
+                    resetPasswordMsg.style.color = '#dc2626';
+                    resetPasswordMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

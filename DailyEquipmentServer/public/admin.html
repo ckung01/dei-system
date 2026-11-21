@@ -12,12 +12,6 @@
         .admin-section {
             margin-bottom: 24px;
         }
-        .admin-grid-2 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 14px;
-            margin-bottom: 14px;
-        }
         .admin-grid-3 {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -46,6 +40,12 @@
             font-size: 0.82rem;
             border-radius: 6px;
         }
+        .btn-approve-sm {
+            background: #16a34a;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+        }
         .btn-danger {
             background: #dc2626;
             color: #ffffff;
@@ -58,6 +58,24 @@
             border: none;
             cursor: pointer;
             margin-right: 6px;
+        }
+        .badge-wait {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            background: #fef3c7;
+            color: #b45309;
+            font-weight: 500;
+        }
+        .badge-ok {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            background: #dcfce7;
+            color: #15803d;
+            font-weight: 500;
         }
         .checkbox-inline {
             display: flex;
@@ -101,6 +119,28 @@
     </nav>
 
     <main class="container main-container">
+        <!-- ส่วนอนุมัติผู้ใช้งานที่สมัครใหม่ -->
+        <section class="card-box admin-section">
+            <h3 class="box-title">อนุมัติผู้ใช้งานที่สมัครใหม่</h3>
+            <div style="overflow-x:auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ชื่อ-นามสกุล</th>
+                            <th>ยูสเซอร์</th>
+                            <th>อีเมล</th>
+                            <th style="width:120px;">สิทธิ์</th>
+                            <th style="width:120px;">สถานะ</th>
+                            <th style="width:120px;">การอนุมัติ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersApprovalTableBody">
+                        <tr><td colspan="6">กำลังโหลดรายชื่อผู้ใช้งาน...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- ส่วนจัดการเครื่องจักร -->
         <section class="card-box admin-section">
             <h3 class="box-title">จัดการรายการเครื่องจักร (เพิ่ม / ลบ)</h3>
@@ -219,12 +259,64 @@
             const headerDate = document.getElementById('headerCurrentDate');
             if (headerDate) headerDate.textContent = DEIStorage.formatThaiFullDate(DEIStorage.getTodayISO());
 
+            const usersBody = document.getElementById('usersApprovalTableBody');
             const machinesBody = document.getElementById('machinesTableBody');
             const questionsBody = document.getElementById('questionsTableBody');
             const questionForm = document.getElementById('questionForm');
             const editingQuestionId = document.getElementById('editingQuestionId');
             const questionFormTitle = document.getElementById('questionFormTitle');
             const cancelEditQuestionBtn = document.getElementById('cancelEditQuestionBtn');
+
+            const roleNameMap = {
+                inspector: 'ผู้ตรวจสอบ',
+                approver: 'ผู้อนุมัติ',
+                admin: 'ผู้ดูแลระบบ'
+            };
+
+            async function renderUsersApprovalTable() {
+                try {
+                    const res = await fetch('/api/admin/users');
+                    const list = await res.json();
+                    if (!Array.isArray(list) || !list.length) {
+                        usersBody.innerHTML = '<tr><td colspan="6">ไม่มีข้อมูลผู้ใช้งาน</td></tr>';
+                        return;
+                    }
+                    usersBody.innerHTML = list.map(u => {
+                        const isApproved = u.approvalStatus === 'approved';
+                        return `
+                            <tr>
+                                <td><strong>${u.fullName || '-'}</strong></td>
+                                <td>${u.username}</td>
+                                <td>${u.email || '-'}</td>
+                                <td>${roleNameMap[u.role] || u.role}</td>
+                                <td>${isApproved ? '<span class="badge-ok">อนุมัติแล้ว</span>' : '<span class="badge-wait">รออนุมัติ</span>'}</td>
+                                <td>
+                                    ${isApproved
+                                        ? '<span style="color:#64748b;font-size:0.85rem;">ใช้งานได้</span>'
+                                        : `<button type="button" class="btn-sm btn-approve-sm" onclick="handleApproveUser(${u.id}, '${u.username}')">อนุมัติ</button>`}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } catch (err) {
+                    usersBody.innerHTML = '<tr><td colspan="6">โหลดข้อมูลผู้ใช้งานไม่สำเร็จ</td></tr>';
+                }
+            }
+
+            window.handleApproveUser = async function (id, username) {
+                try {
+                    const res = await fetch(`/api/admin/users/${id}/approve`, { method: 'PUT' });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        showToast(`อนุมัติบัญชี ${username} เรียบร้อยแล้ว`, 'success');
+                        renderUsersApprovalTable();
+                    } else {
+                        showToast(data.message || 'อนุมัติไม่สำเร็จ', 'error');
+                    }
+                } catch (err) {
+                    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', 'error');
+                }
+            };
 
             function renderMachinesTable() {
                 const list = DEIStorage.getMachines();
@@ -357,6 +449,7 @@
 
             await DEIStorage.init();
             resetQuestionForm();
+            renderUsersApprovalTable();
             renderMachinesTable();
             renderQuestionsTable();
         })();

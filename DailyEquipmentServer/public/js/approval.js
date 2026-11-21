@@ -1,6 +1,6 @@
 /**
  * Daily Equipment Inspection System - หน้าที่สอง: รายการรออนุมัติ (approval.html)
- * ฉบับปรับปรุงรองรับ Server API (Async/Await) 100% + ปุ่มไม่อนุมัติพร้อมช่องกรอกเหตุผล
+ * ฉบับปรับปรุงรองรับ Server API (Async/Await) 100% + ปุ่มไม่อนุมัติพร้อมช่องกรอกเหตุผล + กรอกชื่อผู้อนุมัติ
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -207,13 +207,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         approvalModalBody.innerHTML = `
             <div class="form-group" style="margin-bottom:14px;">
-                <label for="modalApproverSelect">เลือกชื่อผู้อนุมัติรายการตรวจสอบ <span class="required">*</span></label>
-                <select id="modalApproverSelect" class="form-control">
-                    <option value="">-- กรุณาเลือกชื่อผู้อนุมัติ --</option>
-                    <option value="นายสมชาย ใจดี" ${savedApprover === 'นายสมชาย ใจดี' ? 'selected' : ''}>นายสมชาย ใจดี</option>
-                    <option value="นายวิชัย พัฒนกิจ" ${savedApprover === 'นายวิชัย พัฒนกิจ' ? 'selected' : ''}>นายวิชัย พัฒนกิจ</option>
-                    <option value="นางสาวสุภาวดี ศรีสุข" ${savedApprover === 'นางสาวสุภาวดี ศรีสุข' ? 'selected' : ''}>นางสาวสุภาวดี ศรีสุข</option>
-                </select>
+                <label for="modalApproverInput">ชื่อผู้อนุมัติรายการตรวจสอบ <span class="required">*</span></label>
+                <input type="text" id="modalApproverInput" class="form-control" placeholder="ระบุชื่อ-นามสกุล ผู้อนุมัติ" value="${savedApprover}">
             </div>
             ${isReject ? `
                 <div class="form-group" style="margin-bottom:14px;">
@@ -233,18 +228,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isReject) {
                 document.getElementById('modalRejectReasonInput')?.focus();
             } else {
-                document.getElementById('modalApproverSelect')?.focus();
+                document.getElementById('modalApproverInput')?.focus();
             }
         }, 50);
     }
 
     confirmApprovalBtn.addEventListener('click', async () => {
-        const select = document.getElementById('modalApproverSelect');
-        const approverName = select ? select.value : '';
+        const inputEl = document.getElementById('modalApproverInput');
+        const approverName = inputEl ? inputEl.value.trim() : '';
 
         if (!approverName) {
-            showToast('กรุณาเลือกชื่อผู้อนุมัติก่อนยืนยัน', 'error');
-            if (select) select.focus();
+            showToast('กรุณากรอกชื่อผู้อนุมัติก่อนยืนยัน', 'error');
+            if (inputEl) inputEl.focus();
             return;
         }
 

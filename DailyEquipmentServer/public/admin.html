@@ -27,7 +27,7 @@
         .admin-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 14px;
+            margin-top: 12px;
             font-size: 0.92rem;
         }
         .admin-table th, .admin-table td {
@@ -40,6 +40,29 @@
             background: #f8fafc;
             color: #0f172a;
             font-weight: 600;
+        }
+        .table-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+        .btn-plus-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: #16a34a;
+            color: #ffffff;
+            font-size: 1.35rem;
+            line-height: 1;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25);
         }
         .btn-sm {
             padding: 6px 10px;
@@ -87,7 +110,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding-top: 26px;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -147,9 +170,19 @@
             </div>
         </section>
 
-        <!-- 2. จัดการรายการเครื่องจักร (ต้องเลือกอาคารก่อนเพิ่ม) -->
+        <!-- 2. จัดการรายการเครื่องจักร -->
         <section class="card-box admin-section">
-            <h3 class="box-title">จัดการรายการเครื่องจักร (เลือกอาคารก่อนเพิ่มเครื่องจักร)</h3>
+            <h3 class="box-title">จัดการรายการเครื่องจักร</h3>
+
+            <div class="form-group" style="max-width:280px;margin-bottom:14px;">
+                <label for="filterBuildingSelect">ตัวกรองอาคารที่แสดง</label>
+                <select id="filterBuildingSelect" class="form-control">
+                    <option value="ALL" selected>อาคารทั้งหมด</option>
+                    <option value="A">อาคาร A</option>
+                    <option value="B">อาคาร B</option>
+                </select>
+            </div>
+
             <form id="addMachineForm">
                 <div class="admin-grid-3">
                     <div class="form-group">
@@ -177,7 +210,7 @@
                     <thead>
                         <tr>
                             <th style="width:120px;">รหัส</th>
-                            <th style="width:100px;">อาคาร</th>
+                            <th style="width:110px;">อาคาร</th>
                             <th>ชื่อเครื่องจักร</th>
                             <th style="width:110px;">จัดการ</th>
                         </tr>
@@ -189,9 +222,9 @@
             </div>
         </section>
 
-        <!-- 3. จัดการข้อคำถามแยกทีละเครื่อง (เลือกอาคารและเครื่องจักรก่อนเสมอ ไม่มีหมวดการตรวจสอบ) -->
+        <!-- 3. จัดการข้อคำถามเฉพาะเครื่อง -->
         <section class="card-box admin-section">
-            <h3 class="box-title" id="questionFormTitle">จัดการข้อคำถามรายเครื่อง (เลือกอาคารและเครื่องจักรก่อน)</h3>
+            <h3 class="box-title">จัดการข้อคำถามเฉพาะเครื่อง</h3>
 
             <div class="admin-grid-2">
                 <div class="form-group">
@@ -210,57 +243,64 @@
                 </div>
             </div>
 
-            <form id="questionForm">
-                <input type="hidden" id="editingQuestionId" value="">
-                <div class="admin-grid-3">
-                    <div class="form-group">
-                        <label for="qSeqInput">ข้อที่</label>
-                        <input type="number" id="qSeqInput" class="form-control" min="1" value="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="qTitleInput">ข้อความคำถาม <span class="required">*</span></label>
-                        <input type="text" id="qTitleInput" class="form-control" placeholder="กรอกข้อความคำถามของเครื่องนี้" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="qUnitInput">หน่วยค่าตรวจวัด (ถ้ามี)</label>
-                        <input type="text" id="qUnitInput" class="form-control" placeholder="เช่น bar, °C, V">
-                    </div>
-                </div>
-
-                <div class="admin-grid-2">
-                    <div class="form-group">
-                        <label for="qPlaceholderInput">ตัวอย่างค่าที่กรอก (ถ้ามี)</label>
-                        <input type="text" id="qPlaceholderInput" class="form-control" placeholder="เช่น 5.0">
-                    </div>
-                    <div class="form-group checkbox-inline">
-                        <input type="checkbox" id="qHasMeasurementInput">
-                        <label for="qHasMeasurementInput" style="margin:0;cursor:pointer;">มีช่องกรอกค่าตัวเลขตรวจวัด</label>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <button type="submit" id="saveQuestionBtn" class="btn btn-success">+ บันทึกข้อคำถามเฉพาะเครื่องนี้</button>
-                    <button type="button" id="cancelEditQuestionBtn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
-                </div>
-            </form>
+            <div class="table-header-row">
+                <strong id="selectedMachineQuestionHeading">รายการคำถามของเครื่องที่เลือก</strong>
+                <button type="button" id="openAddQuestionModalBtn" class="btn-plus-circle" title="เพิ่มคำถาม">+</button>
+            </div>
 
             <div style="overflow-x:auto;">
                 <table class="admin-table">
                     <thead>
                         <tr>
                             <th style="width:70px;">ข้อที่</th>
-                            <th>หัวข้อคำถามของเครื่องที่เลือก</th>
-                            <th style="width:120px;">ค่าตรวจวัด</th>
+                            <th>คำถาม</th>
+                            <th style="width:110px;">หน่วย</th>
+                            <th style="width:120px;">ตัวอย่างค่า</th>
                             <th style="width:160px;">จัดการ</th>
                         </tr>
                     </thead>
                     <tbody id="questionsTableBody">
-                        <tr><td colspan="4">กรุณาเลือกอาคารและเครื่องจักรก่อนเพื่อดูและจัดการคำถาม</td></tr>
+                        <tr><td colspan="5">กรุณาเลือกอาคารและเครื่องจักรก่อน</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </main>
+
+    <!-- หน้าต่างลอยเพิ่ม / แก้ไข คำถามเฉพาะเครื่อง -->
+    <div id="questionModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-dialog">
+            <div class="modal-header modal-header-blue">
+                <h3 id="questionModalTitle">เพิ่มคำถามใหม่</h3>
+                <button type="button" class="modal-close-btn" id="closeQuestionModalBtn">&times;</button>
+            </div>
+            <form id="questionModalForm">
+                <div class="modal-body">
+                    <input type="hidden" id="modalEditingQuestionId" value="">
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="modalQTitleInput">คำถาม <span class="required">*</span></label>
+                        <input type="text" id="modalQTitleInput" class="form-control" placeholder="เช่น ตรวจสอบแรงดันลม" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="modalQUnitInput">หน่วยค่าตรวจวัด (ถ้ามี)</label>
+                        <input type="text" id="modalQUnitInput" class="form-control" placeholder="เช่น bar, °C, V">
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="modalQPlaceholderInput">ตัวอย่างค่าที่กรอก (ถ้ามี เช่น 5-10 หรือ 8-12)</label>
+                        <input type="text" id="modalQPlaceholderInput" class="form-control" placeholder="8-12">
+                    </div>
+                    <div class="form-group checkbox-inline">
+                        <input type="checkbox" id="modalQHasMeasurementInput">
+                        <label for="modalQHasMeasurementInput" style="margin:0;cursor:pointer;">มีช่องกรอกค่าตัวเลขตรวจวัด</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelQuestionModalBtn">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success">บันทึกคำถาม</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div id="toastContainer" class="toast-container"></div>
 
@@ -275,14 +315,24 @@
             if (headerDate) headerDate.textContent = DEIStorage.formatThaiFullDate(DEIStorage.getTodayISO());
 
             const usersBody = document.getElementById('usersApprovalTableBody');
+            const filterBuildingSelect = document.getElementById('filterBuildingSelect');
             const machinesBody = document.getElementById('machinesTableBody');
-            const questionsBody = document.getElementById('questionsTableBody');
             const targetBuildingSelect = document.getElementById('targetBuildingSelect');
             const targetMachineSelect = document.getElementById('targetMachineSelect');
-            const questionForm = document.getElementById('questionForm');
-            const editingQuestionId = document.getElementById('editingQuestionId');
-            const questionFormTitle = document.getElementById('questionFormTitle');
-            const cancelEditQuestionBtn = document.getElementById('cancelEditQuestionBtn');
+            const selectedMachineQuestionHeading = document.getElementById('selectedMachineQuestionHeading');
+            const questionsBody = document.getElementById('questionsTableBody');
+
+            const questionModal = document.getElementById('questionModal');
+            const questionModalTitle = document.getElementById('questionModalTitle');
+            const questionModalForm = document.getElementById('questionModalForm');
+            const modalEditingQuestionId = document.getElementById('modalEditingQuestionId');
+            const modalQTitleInput = document.getElementById('modalQTitleInput');
+            const modalQUnitInput = document.getElementById('modalQUnitInput');
+            const modalQPlaceholderInput = document.getElementById('modalQPlaceholderInput');
+            const modalQHasMeasurementInput = document.getElementById('modalQHasMeasurementInput');
+
+            // เข้ามาหน้าจัดการระบบทุกครั้ง เลือก "อาคารทั้งหมด" ไว้เสมอ
+            filterBuildingSelect.value = 'ALL';
 
             const roleNameMap = {
                 inspector: 'ผู้ตรวจสอบ',
@@ -335,13 +385,39 @@
                 }
             };
 
+            function renderMachinesTable() {
+                const filterVal = filterBuildingSelect.value;
+                const allList = DEIStorage.getMachines();
+                const list = (!filterVal || filterVal === 'ALL')
+                    ? allList
+                    : allList.filter(m => m.building === filterVal);
+
+                if (!list.length) {
+                    machinesBody.innerHTML = '<tr><td colspan="4">ไม่มีข้อมูลเครื่องจักรในตัวเลือกนี้</td></tr>';
+                    return;
+                }
+                machinesBody.innerHTML = list.map(m => `
+                    <tr>
+                        <td><strong>${m.code}</strong></td>
+                        <td>อาคาร ${m.building}</td>
+                        <td>${m.name}</td>
+                        <td>
+                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteMachine(${m.id}, '${m.code}')">ลบ</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            filterBuildingSelect.addEventListener('change', renderMachinesTable);
+
             function populateTargetMachineDropdown(keepCode = '') {
                 const b = targetBuildingSelect.value;
                 targetMachineSelect.innerHTML = '';
                 if (!b) {
                     targetMachineSelect.disabled = true;
                     targetMachineSelect.innerHTML = '<option value="">-- กรุณาเลือกอาคารก่อน --</option>';
-                    questionsBody.innerHTML = '<tr><td colspan="4">กรุณาเลือกอาคารและเครื่องจักรก่อนเพื่อดูและจัดการคำถาม</td></tr>';
+                    selectedMachineQuestionHeading.textContent = 'รายการคำถามของเครื่องที่เลือก';
+                    questionsBody.innerHTML = '<tr><td colspan="5">กรุณาเลือกอาคารและเครื่องจักรก่อน</td></tr>';
                     return;
                 }
 
@@ -358,54 +434,38 @@
             }
 
             targetBuildingSelect.addEventListener('change', () => {
-                resetQuestionForm();
                 populateTargetMachineDropdown();
             });
 
             targetMachineSelect.addEventListener('change', async () => {
-                resetQuestionForm();
                 await loadAndRenderMachineQuestions();
             });
 
             async function loadAndRenderMachineQuestions() {
                 const code = targetMachineSelect.value;
                 if (!code) {
-                    questionsBody.innerHTML = '<tr><td colspan="4">กรุณาเลือกเครื่องจักรก่อนเพื่อดูและจัดการคำถาม</td></tr>';
+                    selectedMachineQuestionHeading.textContent = 'รายการคำถามของเครื่องที่เลือก';
+                    questionsBody.innerHTML = '<tr><td colspan="5">กรุณาเลือกเครื่องจักรก่อน</td></tr>';
                     return;
                 }
+
                 const list = await DEIStorage.loadQuestions(code);
-                document.getElementById('qSeqInput').value = list.length + 1;
+                selectedMachineQuestionHeading.textContent = `รายการคำถามของเครื่อง ${code} (${list.length} ข้อ)`;
 
                 if (!list.length) {
-                    questionsBody.innerHTML = '<tr><td colspan="4">เครื่องนี้ยังไม่มีข้อคำถาม</td></tr>';
+                    questionsBody.innerHTML = '<tr><td colspan="5">ไม่มีข้อคำถาม</td></tr>';
                     return;
                 }
+
                 questionsBody.innerHTML = list.map((q, index) => `
                     <tr>
-                        <td><strong>${q.seq || (index + 1)}</strong></td>
+                        <td><strong>${index + 1}</strong></td>
                         <td>${q.title}</td>
-                        <td>${q.hasMeasurement ? (q.unit || 'มีค่า') : '-'}</td>
+                        <td>${q.unit || '-'}</td>
+                        <td>${q.placeholder || '8-12'}</td>
                         <td>
-                            <button type="button" class="btn-sm btn-warning-sm" onclick="handleEditQuestion(${q.id})">แก้ไข</button>
-                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteQuestion(${q.id})">ลบ</button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
-
-            function renderMachinesTable() {
-                const list = DEIStorage.getMachines();
-                if (!list.length) {
-                    machinesBody.innerHTML = '<tr><td colspan="4">ไม่มีข้อมูลเครื่องจักร</td></tr>';
-                    return;
-                }
-                machinesBody.innerHTML = list.map(m => `
-                    <tr>
-                        <td><strong>${m.code}</strong></td>
-                        <td>อาคาร ${m.building}</td>
-                        <td>${m.name}</td>
-                        <td>
-                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteMachine(${m.id}, '${m.code}')">ลบ</button>
+                            <button type="button" class="btn-sm btn-warning-sm" onclick="handleEditQuestion(${q.id})" title="แก้ไขคำถาม">✏️ แก้ไข</button>
+                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteQuestion(${q.id})" title="ลบคำถาม">ลบ</button>
                         </td>
                     </tr>
                 `).join('');
@@ -423,45 +483,56 @@
                 }
             };
 
+            function openQuestionModal(questionItem = null) {
+                const code = targetMachineSelect.value;
+                if (!code) {
+                    showToast('กรุณาเลือกอาคารและเครื่องจักรก่อนเพิ่มหรือแก้ไขคำถาม', 'warning');
+                    return;
+                }
+
+                if (questionItem) {
+                    questionModalTitle.textContent = `แก้ไขคำถามเฉพาะเครื่อง ${code}`;
+                    modalEditingQuestionId.value = questionItem.id;
+                    modalQTitleInput.value = questionItem.title || '';
+                    modalQUnitInput.value = questionItem.unit || '';
+                    modalQPlaceholderInput.value = questionItem.placeholder || '8-12';
+                    modalQHasMeasurementInput.checked = Boolean(questionItem.hasMeasurement);
+                } else {
+                    questionModalTitle.textContent = `เพิ่มคำถามใหม่เฉพาะเครื่อง ${code}`;
+                    modalEditingQuestionId.value = '';
+                    questionModalForm.reset();
+                    modalQPlaceholderInput.value = '8-12';
+                }
+
+                questionModal.classList.remove('hidden');
+            }
+
+            function closeQuestionModal() {
+                questionModal.classList.add('hidden');
+            }
+
+            document.getElementById('openAddQuestionModalBtn').addEventListener('click', () => openQuestionModal(null));
+            document.getElementById('closeQuestionModalBtn').addEventListener('click', closeQuestionModal);
+            document.getElementById('cancelQuestionModalBtn').addEventListener('click', closeQuestionModal);
+
             window.handleEditQuestion = function (id) {
                 const q = DEIStorage.getQuestions().find(item => item.id === id);
                 if (!q) return;
-                editingQuestionId.value = q.id;
-                questionFormTitle.textContent = `แก้ไขข้อคำถามเฉพาะเครื่อง ${targetMachineSelect.value} (ข้อที่ ${q.seq})`;
-                document.getElementById('qSeqInput').value = q.seq || 1;
-                document.getElementById('qTitleInput').value = q.title;
-                document.getElementById('qHasMeasurementInput').checked = Boolean(q.hasMeasurement);
-                document.getElementById('qUnitInput').value = q.unit || '';
-                document.getElementById('qPlaceholderInput').value = q.placeholder || '';
-                cancelEditQuestionBtn.classList.remove('hidden');
-                questionForm.scrollIntoView({ behavior: 'smooth' });
+                openQuestionModal(q);
             };
 
             window.handleDeleteQuestion = async function (id) {
                 const code = targetMachineSelect.value;
-                if (!code) { showToast('กรุณาเลือกเครื่องจักรก่อน', 'warning'); return; }
-                if (!confirm('ยืนยันลบข้อคำถามนี้ของเครื่องที่เลือก?')) return;
+                if (!code) return;
+                if (!confirm('ยืนยันลบข้อคำถามนี้? ข้อถัดไปจะรันเลขข้อขึ้นให้อัตโนมัติ')) return;
                 const res = await DEIStorage.deleteQuestion(id, code);
                 if (res.success) {
-                    showToast('ลบข้อคำถามเรียบร้อย', 'success');
+                    showToast('ลบข้อคำถามและจัดลำดับเลขข้อใหม่เรียบร้อย', 'success');
                     await loadAndRenderMachineQuestions();
                 } else {
                     showToast(res.message || 'ลบไม่สำเร็จ', 'error');
                 }
             };
-
-            function resetQuestionForm() {
-                editingQuestionId.value = '';
-                const code = targetMachineSelect.value;
-                questionFormTitle.textContent = code
-                    ? `จัดการข้อคำถามเฉพาะเครื่อง ${code}`
-                    : 'จัดการข้อคำถามรายเครื่อง (เลือกอาคารและเครื่องจักรก่อน)';
-                questionForm.reset();
-                document.getElementById('qSeqInput').value = (DEIStorage.getQuestions().length || 0) + 1;
-                cancelEditQuestionBtn.classList.add('hidden');
-            }
-
-            cancelEditQuestionBtn.addEventListener('click', resetQuestionForm);
 
             document.getElementById('addMachineForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -476,7 +547,7 @@
 
                 const res = await DEIStorage.addMachine({ building, code, name });
                 if (res.success) {
-                    showToast(`เพิ่มเครื่องจักร ${code} ในอาคาร ${building} สำเร็จ (พร้อมคำถาม 15 ข้อพื้นฐาน)`, 'success');
+                    showToast(`เพิ่มเครื่องจักร ${code} ในอาคาร ${building} สำเร็จ (พร้อมคำถาม 15 ข้อ)`, 'success');
                     e.target.reset();
                     renderMachinesTable();
                     if (targetBuildingSelect.value === building) {
@@ -487,40 +558,52 @@
                 }
             });
 
-            questionForm.addEventListener('submit', async (e) => {
+            // ถ้ากรอกช่วงเลข เช่น 5-10 ในช่องตัวอย่างค่า ระบบจะต่อท้ายคำถามด้วย (5-10) อัตโนมัติ
+            questionModalForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const building = targetBuildingSelect.value;
                 const machineCode = targetMachineSelect.value;
-                if (!building || !machineCode) {
-                    showToast('กรุณาเลือกอาคารและเครื่องจักรก่อนบันทึกข้อคำถาม', 'warning');
+                if (!machineCode) {
+                    showToast('กรุณาเลือกเครื่องจักรก่อน', 'warning');
                     return;
+                }
+
+                let rawTitle = modalQTitleInput.value.trim();
+                const unit = modalQUnitInput.value.trim();
+                const exampleVal = (modalQPlaceholderInput.value || '8-12').trim();
+                const hasMeasurement = modalQHasMeasurementInput.checked;
+
+                const rangeMatch = exampleVal.match(/^\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?$/);
+                if (rangeMatch) {
+                    const cleanRange = exampleVal.replace(/\s+/g, '');
+                    const suffix = `(${cleanRange})`;
+                    if (!rawTitle.includes(suffix)) {
+                        rawTitle = `${rawTitle} ${suffix}`;
+                    }
                 }
 
                 const payload = {
                     machineCode,
-                    seq: Number(document.getElementById('qSeqInput').value) || 1,
-                    title: document.getElementById('qTitleInput').value.trim(),
-                    hasMeasurement: document.getElementById('qHasMeasurementInput').checked,
-                    unit: document.getElementById('qUnitInput').value.trim(),
-                    placeholder: document.getElementById('qPlaceholderInput').value.trim()
+                    title: rawTitle,
+                    unit,
+                    placeholder: exampleVal || '8-12',
+                    hasMeasurement
                 };
 
-                const id = editingQuestionId.value;
-                const res = id
-                    ? await DEIStorage.updateQuestion(id, payload)
+                const editId = modalEditingQuestionId.value;
+                const res = editId
+                    ? await DEIStorage.updateQuestion(editId, payload)
                     : await DEIStorage.addQuestion(payload);
 
                 if (res.success) {
-                    showToast(id ? 'อัปเดตข้อคำถามของเครื่องนี้สำเร็จ' : 'เพิ่มข้อคำถามใหม่ของเครื่องนี้สำเร็จ', 'success');
-                    resetQuestionForm();
+                    showToast(editId ? 'แก้ไขคำถามเรียบร้อย' : 'เพิ่มคำถามใหม่เรียบร้อย', 'success');
+                    closeQuestionModal();
                     await loadAndRenderMachineQuestions();
                 } else {
-                    showToast(res.message || 'บันทึกข้อคำถามไม่สำเร็จ', 'error');
+                    showToast(res.message || 'บันทึกคำถามไม่สำเร็จ', 'error');
                 }
             });
 
             await DEIStorage.init();
-            resetQuestionForm();
             renderUsersApprovalTable();
             renderMachinesTable();
         })();

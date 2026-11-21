@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการระบบ (Admin) - ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .admin-section {
+            margin-bottom: 24px;
+        }
+        .admin-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+        .admin-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            font-size: 0.92rem;
+        }
+        .admin-table th, .admin-table td {
+            border: 1px solid #e2e8f0;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .admin-table th {
+            background: #f8fafc;
+            color: #0f172a;
+            font-weight: 600;
+        }
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.82rem;
+            border-radius: 6px;
+        }
+        .btn-danger {
+            background: #dc2626;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-warning-sm {
+            background: #f59e0b;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            margin-right: 6px;
+        }
+        .checkbox-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-top: 26px;
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="container header-content">
+            <div class="header-left">
+                <div class="factory-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+                        <path d="M22 22H2V10l7-3v4l7-3v4h6v10zM4 20h16v-6h-6v-3.17l-7 3V9.83l-3 1.29V20zm14-18h2v7h-2V2zm-4 2h2v5h-2V4z"/>
+                    </svg>
+                </div>
+                <div class="header-titles">
+                    <h1>ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</h1>
+                    <p>Daily Equipment Inspection System - Admin Panel</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="current-date" id="headerCurrentDate">กำลังโหลดวันที่...</div>
+                <div class="user-role-badge">
+                    <span class="role-dot"></span> ผู้ดูแลระบบ
+                </div>
+                <button type="button" class="btn-logout">ออกจากระบบ</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="container nav-list">
+            <a href="index.html" class="nav-item">ตรวจเช็กประจำวัน</a>
+            <a href="approval.html" class="nav-item">รายการรออนุมัติ</a>
+            <a href="history.html" class="nav-item">ประวัติการตรวจสอบ</a>
+            <a href="admin.html" class="nav-item active">จัดการระบบ (Admin)</a>
+        </div>
+    </nav>
+
+    <main class="container main-container">
+        <!-- ส่วนจัดการเครื่องจักร -->
+        <section class="card-box admin-section">
+            <h3 class="box-title">จัดการรายการเครื่องจักร (เพิ่ม / ลบ)</h3>
+            <form id="addMachineForm">
+                <div class="admin-grid-3">
+                    <div class="form-group">
+                        <label for="machineCodeInput">รหัสเครื่องจักร <span class="required">*</span></label>
+                        <input type="text" id="machineCodeInput" class="form-control" placeholder="เช่น A-M013" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="machineBuildingInput">อาคาร <span class="required">*</span></label>
+                        <select id="machineBuildingInput" class="form-control" required>
+                            <option value="A">อาคาร A</option>
+                            <option value="B">อาคาร B</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="machineNameInput">ชื่อเครื่องจักร <span class="required">*</span></label>
+                        <input type="text" id="machineNameInput" class="form-control" placeholder="ระบุชื่อเครื่องจักร" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">+ เพิ่มเครื่องจักร</button>
+            </form>
+
+            <div style="overflow-x:auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:120px;">รหัส</th>
+                            <th style="width:100px;">อาคาร</th>
+                            <th>ชื่อเครื่องจักร</th>
+                            <th style="width:110px;">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="machinesTableBody">
+                        <tr><td colspan="4">กำลังโหลดข้อมูล...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ส่วนจัดการคำถามตรวจเช็ก -->
+        <section class="card-box admin-section">
+            <h3 class="box-title" id="questionFormTitle">จัดการข้อคำถามตรวจเช็ก (เพิ่มข้อใหม่ / แก้ไข / ลบ)</h3>
+            <form id="questionForm">
+                <input type="hidden" id="editingQuestionId" value="">
+                <div class="admin-grid-3">
+                    <div class="form-group">
+                        <label for="qCatSelect">หมวดการตรวจสอบ <span class="required">*</span></label>
+                        <select id="qCatSelect" class="form-control" required>
+                            <option value="01|ระบบแรงดันและระบบท่อ">หมวด 01: ระบบแรงดันและระบบท่อ</option>
+                            <option value="02|ระบบทำความเย็นและอุณหภูมิ">หมวด 02: ระบบทำความเย็นและอุณหภูมิ</option>
+                            <option value="03|ระบบไฟฟ้าและการควบคุม">หมวด 03: ระบบไฟฟ้าและการควบคุม</option>
+                            <option value="04|ระบบทั่วไปและความปลอดภัย" selected>หมวด 04: ระบบทั่วไปและความปลอดภัย</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="qSeqInput">ลำดับข้อที่ (เช่น 16)</label>
+                        <input type="number" id="qSeqInput" class="form-control" min="1" value="16" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="qTitleInput">ข้อความคำถาม <span class="required">*</span></label>
+                        <input type="text" id="qTitleInput" class="form-control" placeholder="เช่น ตรวจสอบระดับเสียงรบกวน (dB)" required>
+                    </div>
+                </div>
+
+                <div class="admin-grid-3">
+                    <div class="form-group">
+                        <label for="qUnitInput">หน่วยค่าตรวจวัด (ถ้ามี)</label>
+                        <input type="text" id="qUnitInput" class="form-control" placeholder="เช่น bar, °C, V, dB">
+                    </div>
+                    <div class="form-group">
+                        <label for="qPlaceholderInput">ตัวอย่างค่าที่กรอก (ถ้ามี)</label>
+                        <input type="text" id="qPlaceholderInput" class="form-control" placeholder="เช่น 75">
+                    </div>
+                    <div class="form-group checkbox-inline">
+                        <input type="checkbox" id="qHasMeasurementInput">
+                        <label for="qHasMeasurementInput" style="margin:0;cursor:pointer;">มีช่องกรอกค่าตัวเลขตรวจวัด</label>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button type="submit" id="saveQuestionBtn" class="btn btn-success">+ บันทึกข้อคำถาม</button>
+                    <button type="button" id="cancelEditQuestionBtn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
+                </div>
+            </form>
+
+            <div style="overflow-x:auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:70px;">ข้อที่</th>
+                            <th style="width:220px;">หมวด</th>
+                            <th>หัวข้อคำถาม</th>
+                            <th style="width:110px;">ค่าตรวจวัด</th>
+                            <th style="width:160px;">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="questionsTableBody">
+                        <tr><td colspan="5">กำลังโหลดข้อมูล...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/data.js"></script>
+    <script>
+        (async function () {
+            const user = DEIAuth.enforceAccess(['admin']);
+            if (!user) return;
+
+            const headerDate = document.getElementById('headerCurrentDate');
+            if (headerDate) headerDate.textContent = DEIStorage.formatThaiFullDate(DEIStorage.getTodayISO());
+
+            const machinesBody = document.getElementById('machinesTableBody');
+            const questionsBody = document.getElementById('questionsTableBody');
+            const questionForm = document.getElementById('questionForm');
+            const editingQuestionId = document.getElementById('editingQuestionId');
+            const questionFormTitle = document.getElementById('questionFormTitle');
+            const cancelEditQuestionBtn = document.getElementById('cancelEditQuestionBtn');
+
+            function renderMachinesTable() {
+                const list = DEIStorage.getMachines();
+                if (!list.length) {
+                    machinesBody.innerHTML = '<tr><td colspan="4">ไม่มีข้อมูลเครื่องจักร</td></tr>';
+                    return;
+                }
+                machinesBody.innerHTML = list.map(m => `
+                    <tr>
+                        <td><strong>${m.code}</strong></td>
+                        <td>อาคาร ${m.building}</td>
+                        <td>${m.name}</td>
+                        <td>
+                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteMachine(${m.id}, '${m.code}')">ลบ</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            function renderQuestionsTable() {
+                const list = DEIStorage.getQuestions();
+                if (!list.length) {
+                    questionsBody.innerHTML = '<tr><td colspan="5">ไม่มีข้อมูลข้อคำถาม</td></tr>';
+                    return;
+                }
+                questionsBody.innerHTML = list.map((q, index) => `
+                    <tr>
+                        <td><strong>${q.seq || (index + 1)}</strong></td>
+                        <td>${q.catCode} - ${q.catName}</td>
+                        <td>${q.title}</td>
+                        <td>${q.hasMeasurement ? (q.unit || 'มีค่า') : '-'}</td>
+                        <td>
+                            <button type="button" class="btn-sm btn-warning-sm" onclick="handleEditQuestion(${q.id})">แก้ไข</button>
+                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteQuestion(${q.id})">ลบ</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            window.handleDeleteMachine = async function (id, code) {
+                if (!confirm(`ยืนยันลบเครื่องจักร ${code} ?`)) return;
+                const res = await DEIStorage.deleteMachine(id);
+                if (res.success) {
+                    showToast(`ลบเครื่องจักร ${code} แล้ว`, 'success');
+                    renderMachinesTable();
+                } else {
+                    showToast(res.message || 'ลบไม่สำเร็จ', 'error');
+                }
+            };
+
+            window.handleEditQuestion = function (id) {
+                const q = DEIStorage.getQuestions().find(item => item.id === id);
+                if (!q) return;
+                editingQuestionId.value = q.id;
+                questionFormTitle.textContent = `แก้ไขข้อคำถาม (ID: ${q.id})`;
+                document.getElementById('qCatSelect').value = `${q.catCode}|${q.catName}`;
+                document.getElementById('qSeqInput').value = q.seq || 1;
+                document.getElementById('qTitleInput').value = q.title;
+                document.getElementById('qHasMeasurementInput').checked = Boolean(q.hasMeasurement);
+                document.getElementById('qUnitInput').value = q.unit || '';
+                document.getElementById('qPlaceholderInput').value = q.placeholder || '';
+                cancelEditQuestionBtn.classList.remove('hidden');
+                questionForm.scrollIntoView({ behavior: 'smooth' });
+            };
+
+            window.handleDeleteQuestion = async function (id) {
+                if (!confirm('ยืนยันลบข้อคำถามนี้?')) return;
+                const res = await DEIStorage.deleteQuestion(id);
+                if (res.success) {
+                    showToast('ลบข้อคำถามเรียบร้อย', 'success');
+                    renderQuestionsTable();
+                } else {
+                    showToast(res.message || 'ลบไม่สำเร็จ', 'error');
+                }
+            };
+
+            function resetQuestionForm() {
+                editingQuestionId.value = '';
+                questionFormTitle.textContent = 'จัดการข้อคำถามตรวจเช็ก (เพิ่มข้อใหม่ / แก้ไข / ลบ)';
+                questionForm.reset();
+                const nextSeq = DEIStorage.getQuestions().length + 1;
+                document.getElementById('qSeqInput').value = nextSeq;
+                cancelEditQuestionBtn.classList.add('hidden');
+            }
+
+            cancelEditQuestionBtn.addEventListener('click', resetQuestionForm);
+
+            document.getElementById('addMachineForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const code = document.getElementById('machineCodeInput').value.trim();
+                const building = document.getElementById('machineBuildingInput').value;
+                const name = document.getElementById('machineNameInput').value.trim();
+
+                const res = await DEIStorage.addMachine({ code, building, name });
+                if (res.success) {
+                    showToast(`เพิ่มเครื่องจักร ${code} สำเร็จ`, 'success');
+                    e.target.reset();
+                    renderMachinesTable();
+                } else {
+                    showToast(res.message || 'เพิ่มเครื่องจักรไม่สำเร็จ', 'error');
+                }
+            });
+
+            questionForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const [catCode, catName] = document.getElementById('qCatSelect').value.split('|');
+                const payload = {
+                    catCode,
+                    catName,
+                    seq: Number(document.getElementById('qSeqInput').value) || 1,
+                    title: document.getElementById('qTitleInput').value.trim(),
+                    hasMeasurement: document.getElementById('qHasMeasurementInput').checked,
+                    unit: document.getElementById('qUnitInput').value.trim(),
+                    placeholder: document.getElementById('qPlaceholderInput').value.trim()
+                };
+
+                const id = editingQuestionId.value;
+                const res = id
+                    ? await DEIStorage.updateQuestion(id, payload)
+                    : await DEIStorage.addQuestion(payload);
+
+                if (res.success) {
+                    showToast(id ? 'อัปเดตข้อคำถามสำเร็จ' : 'เพิ่มข้อคำถามใหม่สำเร็จ', 'success');
+                    resetQuestionForm();
+                    renderQuestionsTable();
+                } else {
+                    showToast(res.message || 'บันทึกข้อคำถามไม่สำเร็จ', 'error');
+                }
+            });
+
+            await DEIStorage.init();
+            resetQuestionForm();
+            renderMachinesTable();
+            renderQuestionsTable();
+        })();
+    </script>
+</body>
+</html>

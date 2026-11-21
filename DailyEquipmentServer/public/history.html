@@ -152,7 +152,9 @@
 
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="js/data.js"></script>
-    <script src="js/history.js"></script>
-</body>
-</html>
+    <script src="js/auth.js"></script>
+        <script>DEIAuth.enforceAccess(['inspector', 'approver', 'admin']);</script>
+        <script src="js/data.js"></script>
+        <script src="js/history.js"></script>
+    </body>
+    </html>

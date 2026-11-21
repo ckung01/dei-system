@@ -1,15 +1,48 @@
 let CACHED_MACHINES = [];
 let CACHED_QUESTIONS = [];
 
+function parseMachineCodeForSort(code) {
+    const clean = String(code || '').trim().toUpperCase();
+    const match = clean.match(/^(.*?)(\d+)$/);
+    if (match) {
+        return {
+            prefix: match[1],
+            num: parseInt(match[2], 10),
+            raw: clean
+        };
+    }
+    return {
+        prefix: clean,
+        num: Number.MAX_SAFE_INTEGER,
+        raw: clean
+    };
+}
+
+function compareMachineCodeNaturally(a, b) {
+    const partA = parseMachineCodeForSort(a.code);
+    const partB = parseMachineCodeForSort(b.code);
+
+    if (partA.prefix !== partB.prefix) {
+        return partA.prefix.localeCompare(partB.prefix, 'en', { numeric: true });
+    }
+    if (partA.num !== partB.num) {
+        return partA.num - partB.num;
+    }
+    return partA.raw.localeCompare(partB.raw, 'en', { numeric: true });
+}
+
 function dedupeMachinesList(list) {
     if (!Array.isArray(list)) return [];
     const seenCodes = new Set();
-    return list.filter(m => {
-        const codeKey = String(m.code || '').trim().toUpperCase();
-        if (!codeKey || seenCodes.has(codeKey)) return false;
-        seenCodes.add(codeKey);
-        return true;
-    });
+    return list
+        .filter(m => {
+            if (!m) return false;
+            const codeKey = String(m.code || '').trim().toUpperCase();
+            if (!codeKey || seenCodes.has(codeKey)) return false;
+            seenCodes.add(codeKey);
+            return true;
+        })
+        .sort(compareMachineCodeNaturally);
 }
 
 function groupQuestionsIntoCategories(questionsList) {
@@ -71,9 +104,9 @@ const DEIStorage = {
     },
 
     getMachinesByBuilding(b) {
-        const targetBuilding = String(b || '').trim();
+        const targetBuilding = String(b || '').trim().toUpperCase();
         const filtered = dedupeMachinesList(CACHED_MACHINES).filter(
-            m => String(m.building || '').trim() === targetBuilding
+            m => String(m.building || '').trim().toUpperCase() === targetBuilding
         );
         return dedupeMachinesList(filtered);
     },

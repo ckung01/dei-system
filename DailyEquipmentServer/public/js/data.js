@@ -1,32 +1,21 @@
-/**
- * Daily Equipment Inspection System - Data Management (Database API Version)
- */
-
 let CACHED_MACHINES = [];
 let CACHED_QUESTIONS = [];
 
 function groupQuestionsIntoCategories(questionsList) {
-    const map = new Map();
-    questionsList.forEach(q => {
-        const key = `${q.catCode || '04'}|${q.catName || 'หมวดทั่วไป'}`;
-        if (!map.has(key)) {
-            map.set(key, {
-                catCode: q.catCode || '04',
-                catClass: q.catClass || `cat-${q.catCode || '04'}`,
-                catName: q.catName || 'หมวดทั่วไป',
-                items: []
-            });
-        }
-        map.get(key).items.push({
+    if (!Array.isArray(questionsList) || questionsList.length === 0) return [];
+    return [{
+        catCode: '01',
+        catClass: 'cat-01',
+        catName: 'รายการตรวจสอบเครื่องจักรประจำวัน',
+        items: questionsList.map((q, idx) => ({
             id: q.id,
-            seq: q.seq,
+            seq: q.seq || (idx + 1),
             title: q.title,
             hasMeasurement: Boolean(q.hasMeasurement),
             unit: q.unit || '',
             placeholder: q.placeholder || ''
-        });
-    });
-    return Array.from(map.values());
+        }))
+    }];
 }
 
 const DEIStorage = {
@@ -50,9 +39,12 @@ const DEIStorage = {
         return CACHED_MACHINES;
     },
 
-    async loadQuestions() {
+    async loadQuestions(machineCode = '') {
         try {
-            const res = await fetch('/api/questions');
+            const url = machineCode
+                ? `/api/questions?machineCode=${encodeURIComponent(machineCode)}`
+                : '/api/questions';
+            const res = await fetch(url);
             const data = await res.json();
             if (Array.isArray(data)) {
                 CACHED_QUESTIONS = data;
@@ -108,7 +100,7 @@ const DEIStorage = {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (res.ok && data.success) await this.loadQuestions();
+        if (res.ok && data.success) await this.loadQuestions(payload.machineCode || '');
         return data;
     },
 
@@ -119,14 +111,14 @@ const DEIStorage = {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (res.ok && data.success) await this.loadQuestions();
+        if (res.ok && data.success) await this.loadQuestions(payload.machineCode || '');
         return data;
     },
 
-    async deleteQuestion(id) {
+    async deleteQuestion(id, machineCode = '') {
         const res = await fetch(`/api/questions/${id}`, { method: 'DELETE' });
         const data = await res.json();
-        if (res.ok && data.success) await this.loadQuestions();
+        if (res.ok && data.success) await this.loadQuestions(machineCode);
         return data;
     },
 
@@ -139,9 +131,6 @@ const DEIStorage = {
             return [];
         }
     },
-
-    getSettings() { return { lastSelectedApprover: '' }; },
-    updateSettings() {},
 
     getTodayISO() {
         const now = new Date();
@@ -166,11 +155,6 @@ const DEIStorage = {
         if (iso instanceof Date) return iso;
         const [y, m, day] = String(iso).split('-').map(Number);
         return new Date(y, (m || 1) - 1, day || 1);
-    },
-
-    async findInspectionByMachineAndDate(code, dateISO) {
-        const list = await this.getInspections();
-        return list.find(i => i.machineCode === code && i.inspectionDate === dateISO) || null;
     },
 
     async upsertInspection(record) {
@@ -211,7 +195,7 @@ const DEIStorage = {
         const totalMachines = CACHED_MACHINES.length || 24;
         const todayISO = this.getTodayISO();
         const inspections = await this.getInspections();
-        const todayInspections = inspections.filter(i => i.inspectionDate === todayISO);
+        const todayInspections = inspections.filter(i => String(i.inspectionDate || '').split('T')[0] === todayISO);
 
         const inspectedSet = new Set(todayInspections.map(i => i.machineCode));
         const totalInspectedCount = inspectedSet.size;
@@ -224,14 +208,12 @@ const DEIStorage = {
         todayInspections.forEach(rec => {
             let hasAbnormal = false;
             let hasWarning = false;
-
             if (Array.isArray(rec.items)) {
                 rec.items.forEach(item => {
                     if (item.status === 'abnormal') hasAbnormal = true;
                     if (item.status === 'warning') hasWarning = true;
                 });
             }
-
             if (hasAbnormal) abnormalMachines++;
             else if (hasWarning) warningMachines++;
             else normalMachines++;
@@ -295,12 +277,12 @@ function buildInspectionDetailHTML(record) {
         : '<span class="status-pill pending">รออนุมัติ</span>';
 
     let rows = '';
-    record.items.forEach((item, idx) => {
+    (record.items || []).forEach((item, idx) => {
         rows += `
             <tr>
                 <td style="text-align:center;">${idx + 1}</td>
-                <td><small class="text-muted">${item.categoryName}</small><br><strong>${item.title}</strong></td>
-                <td>${item.hasMeasurement ? `${item.measurementValue || '-'} ${item.unit}` : '-'}</td>
+                <td><strong>${item.title}</strong></td>
+                <td>${item.hasMeasurement ? `${item.measurementValue || '-'} ${item.unit || ''}` : '-'}</td>
                 <td>${statusMap[item.status] || '-'}</td>
                 <td>${item.remark || '-'}</td>
             </tr>

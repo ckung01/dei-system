@@ -15,14 +15,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetFormBtn = document.getElementById('resetFormBtn');
     const submitFormBtn = inspectionFormContainer.querySelector('button[type="submit"]');
 
-    // แถบแสดงรายการเครื่องจักรแบบสีจริง (สีเขียว = ตรวจแล้ว, สีดำ = ยังไม่ตรวจ/ไม่อนุมัติ, ต่อท้าย [รออนุมัติ])
-    let machineColorListBox = document.getElementById('machineColorStatusBox');
-    if (!machineColorListBox && machineSelect && machineSelect.parentElement) {
-        machineColorListBox = document.createElement('div');
-        machineColorListBox.id = 'machineColorStatusBox';
-        machineColorListBox.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;';
-        machineSelect.parentElement.appendChild(machineColorListBox);
-    }
+    // ลบกล่องปุ่มซ้ำด้านล่างออกถ้าเคยสร้างไว้
+    const oldExtraBox = document.getElementById('machineColorStatusBox');
+    if (oldExtraBox) oldExtraBox.remove();
 
     if (isReadOnlyApprover) {
         inspectorNameInput.disabled = true;
@@ -45,34 +40,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function getFlatQuestions() {
         const cats = DEIStorage.getChecklistCategories();
-        return cats.flatMap((cat, cIdx) =>
+        return cats.flatMap((cat) =>
             cat.items.map((item, idx) => ({
                 ...item,
                 seq: idx + 1,
                 categoryCode: cat.catCode || '01',
-                categoryName: cat.catName || 'รายการตรวจสอบเครื่องจักรทั้งหมด'
+                categoryName: cat.catName || 'รายการตรวจสอบเครื่องจักรประจำวัน'
             }))
         );
     }
 
-    function getMachineDisplayInfo(m, todayInspections) {
+    // อนุมัติแล้ว = ตัวอักษรสีเขียว, รออนุมัติ = ต่อท้าย [รออนุมัติ] (ตัวอักษรสีดำ), ยังไม่ตรวจ/ไม่อนุมัติ = ตัวอักษรสีดำ
+    function getOptionDisplay(m, todayInspections) {
         const rec = todayInspections.find(i => i.machineCode === m.code);
         if (!rec) {
-            return { label: `${m.code} - ${m.name}`, color: '#0f172a', bg: '#f8fafc', border: '#cbd5e1' };
+            return { text: `${m.code} - ${m.name}`, color: '#0f172a' };
+        }
+        if (rec.approvalStatus === 'อนุมัติแล้ว') {
+            return { text: `${m.code} - ${m.name}`, color: '#16a34a' };
         }
         if (rec.approvalStatus === 'รออนุมัติ') {
-            return { label: `${m.code} - ${m.name} [รออนุมัติ]`, color: '#16a34a', bg: '#f0fdf4', border: '#86efac' };
+            return { text: `${m.code} - ${m.name} [รออนุมัติ]`, color: '#0f172a' };
         }
-        if (rec.approvalStatus === 'ไม่อนุมัติ') {
-            return { label: `${m.code} - ${m.name}`, color: '#0f172a', bg: '#f8fafc', border: '#cbd5e1' };
-        }
-        return { label: `${m.code} - ${m.name}`, color: '#16a34a', bg: '#f0fdf4', border: '#86efac' };
+        return { text: `${m.code} - ${m.name}`, color: '#0f172a' };
     }
+
+    function applySelectedOptionColor() {
+        const selectedOpt = machineSelect.options[machineSelect.selectedIndex];
+        machineSelect.style.color = (selectedOpt && selectedOpt.style.color) ? selectedOpt.style.color : '#0f172a';
+    }
+
+    machineSelect.addEventListener('change', applySelectedOptionColor);
 
     buildingSelect.addEventListener('change', async () => {
         const b = buildingSelect.value;
         machineSelect.innerHTML = '';
-        if (machineColorListBox) machineColorListBox.innerHTML = '';
+        machineSelect.style.color = '#0f172a';
 
         if (!b) {
             machineSelect.disabled = true;
@@ -95,35 +98,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         machines.forEach(m => {
-            const info = getMachineDisplayInfo(m, todayInspections);
+            const disp = getOptionDisplay(m, todayInspections);
             const opt = document.createElement('option');
             opt.value = m.code;
-            opt.textContent = info.label;
-            opt.style.color = info.color;
+            opt.textContent = disp.text;
+            opt.style.color = disp.color;
             machineSelect.appendChild(opt);
-
-            if (machineColorListBox) {
-                const chip = document.createElement('button');
-                chip.type = 'button';
-                chip.textContent = info.label;
-                chip.style.cssText = `
-                    padding: 6px 10px;
-                    border-radius: 8px;
-                    border: 1px solid ${info.border};
-                    background: ${info.bg};
-                    color: ${info.color};
-                    font-family: 'Prompt', sans-serif;
-                    font-size: 0.85rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                `;
-                chip.addEventListener('click', async () => {
-                    machineSelect.value = m.code;
-                    currentMachine = m;
-                    await openForm(m);
-                });
-                machineColorListBox.appendChild(chip);
-            }
         });
     });
 
@@ -211,7 +191,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         inspectionFormContainer.classList.remove('hidden');
     }
 
-    // เรียงคำถามยาวลงมาเลย 15 ข้อ ไม่แยกหมวดหมู่
     function renderChecklist() {
         const itemsList = getFlatQuestions();
         checklistCategoriesContainer.innerHTML = '';
@@ -232,8 +211,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
             const needRemark = st.status === 'warning' || st.status === 'abnormal';
 
-            let placeholderText = item.placeholder || '8-12';
-            if (MEASUREMENT_RANGES[displaySeq]) {
+            let placeholderText = item.placeholder || 'กรอกค่าตรวจวัด';
+            if (MEASUREMENT_RANGES[displaySeq] && !item.placeholder) {
                 const r = MEASUREMENT_RANGES[displaySeq];
                 placeholderText = `ปกติ ${r.min}-${r.max} ${item.unit}`;
             }

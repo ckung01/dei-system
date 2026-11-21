@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    const currentUser = DEIAuth.getUser();
-    const isReadOnlyApprover = currentUser && currentUser.role === 'approver';
-
     await DEIStorage.init();
     await DEIStorage.renderSharedHeaderAndDashboard();
 
@@ -15,19 +12,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetFormBtn = document.getElementById('resetFormBtn');
     const submitFormBtn = inspectionFormContainer.querySelector('button[type="submit"]');
 
-    // ลบกล่องปุ่มซ้ำด้านล่างออกถ้าเคยสร้างไว้
-    const oldExtraBox = document.getElementById('machineColorStatusBox');
-    if (oldExtraBox) oldExtraBox.remove();
-
-    if (isReadOnlyApprover) {
-        inspectorNameInput.disabled = true;
-        inspectorNameInput.placeholder = 'โหมดดูข้อมูลสำหรับผู้อนุมัติ (ไม่สามารถกรอกหรือบันทึกได้)';
-        if (resetFormBtn) resetFormBtn.style.display = 'none';
-        if (submitFormBtn) submitFormBtn.style.display = 'none';
-    }
-
     let currentMachine = null;
     let checklistState = {};
+    let isLockedBySubmission = false;
 
     const MEASUREMENT_RANGES = {
         1: { min: 4.0, max: 8.0, name: 'แรงดันด้านขาดูด' },
@@ -50,7 +37,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
     }
 
-    // อนุมัติแล้ว = ตัวอักษรสีเขียว, รออนุมัติ = ต่อท้าย [รออนุมัติ] (ตัวอักษรสีดำ), ยังไม่ตรวจ/ไม่อนุมัติ = ตัวอักษรสีดำ
+    // อนุมัติแล้ว = ตัวอักษรสีเขียว ไม่มี [รออนุมัติ]
+    // รออนุมัติ = ต่อท้าย [รออนุมัติ]
+    // ยังไม่ตรวจ หรือ ไม่อนุมัติ = ตัวอักษรสีดำ ไม่มี [รออนุมัติ]
     function getOptionDisplay(m, todayInspections) {
         const rec = todayInspections.find(i => i.machineCode === m.code);
         if (!rec) {
@@ -68,6 +57,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     function applySelectedOptionColor() {
         const selectedOpt = machineSelect.options[machineSelect.selectedIndex];
         machineSelect.style.color = (selectedOpt && selectedOpt.style.color) ? selectedOpt.style.color : '#0f172a';
+    }
+
+    function applyFormLockState(locked) {
+        isLockedBySubmission = locked;
+        inspectorNameInput.disabled = locked;
+        if (resetFormBtn) {
+            resetFormBtn.disabled = locked;
+            resetFormBtn.style.display = locked ? 'none' : '';
+        }
+        if (submitFormBtn) {
+            submitFormBtn.disabled = locked;
+            submitFormBtn.style.display = locked ? 'none' : '';
+        }
     }
 
     machineSelect.addEventListener('change', applySelectedOptionColor);
@@ -157,12 +159,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (existing) {
             banner.classList.remove('hidden');
-            badge.textContent = existing.approvalStatus === 'รออนุมัติ'
-                ? 'รออนุมัติ'
-                : existing.approvalStatus === 'ไม่อนุมัติ'
-                    ? 'ไม่อนุมัติ'
-                    : 'ตรวจแล้ววันนี้';
-            badge.classList.add('checked');
+            const isRejected = existing.approvalStatus === 'ไม่อนุมัติ';
+            applyFormLockState(!isRejected);
+
+            if (existing.approvalStatus === 'อนุมัติแล้ว') {
+                badge.textContent = 'อนุมัติแล้ว (ล็อกแก้ไข)';
+                badge.classList.add('checked');
+                banner.innerHTML = '<strong>สถานะ: อนุมัติแล้ว</strong> — ส่งข้อมูลแล้วและไม่สามารถแก้ไขได้';
+            } else if (existing.approvalStatus === 'รออนุมัติ') {
+                badge.textContent = 'รออนุมัติ (ล็อกแก้ไข)';
+                badge.classList.add('checked');
+                banner.innerHTML = '<strong>สถานะ: รออนุมัติ</strong> — ส่งข้อมูลแล้วและไม่สามารถแก้ไขได้จนกว่าผู้อนุมัติจะกดไม่อนุมัติ';
+            } else {
+                badge.textContent = 'ไม่อนุมัติ (แก้ไขได้)';
+                badge.classList.remove('checked');
+                banner.innerHTML = `<strong>สถานะ: ไม่อนุมัติ</strong> — ผู้อนุมัติไม่อนุมัติ (${existing.rejectReason || 'กรุณาตรวจสอบและแก้ไข'}) สามารถแก้ไขและส่งใหม่ได้`;
+            }
+
             inspectorNameInput.value = existing.inspectorName || '';
 
             if (Array.isArray(existing.items)) {
@@ -180,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             showToast('โหลดข้อมูลของวันนี้แล้ว', 'info');
         } else {
             banner.classList.add('hidden');
+            applyFormLockState(false);
             badge.textContent = 'ยังไม่ตรวจวันนี้';
             badge.classList.remove('checked');
             inspectorNameInput.value = '';
@@ -228,19 +242,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="item-right-controls">
                         ${item.hasMeasurement ? `
                             <div class="measurement-box" title="ตัวอย่างค่า: ${placeholderText}">
-                                <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" placeholder="${placeholderText}" value="${st.measurementValue}" ${isReadOnlyApprover ? 'disabled' : ''}>
+                                <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" placeholder="${placeholderText}" value="${st.measurementValue}" ${isLockedBySubmission ? 'disabled' : ''}>
                                 <span class="measurement-unit">${item.unit}</span>
                             </div>
                         ` : ''}
                         <div class="status-btn-group">
-                            <button type="button" class="status-btn ${st.status === 'normal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="normal" ${isReadOnlyApprover ? 'disabled' : ''}>ปกติ</button>
-                            <button type="button" class="status-btn ${st.status === 'warning' ? 'selected' : ''}" data-item-id="${item.id}" data-status="warning" ${isReadOnlyApprover ? 'disabled' : ''}>เฝ้าระวัง</button>
-                            <button type="button" class="status-btn ${st.status === 'abnormal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="abnormal" ${isReadOnlyApprover ? 'disabled' : ''}>ผิดปกติ</button>
+                            <button type="button" class="status-btn ${st.status === 'normal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="normal" ${isLockedBySubmission ? 'disabled' : ''}>ปกติ</button>
+                            <button type="button" class="status-btn ${st.status === 'warning' ? 'selected' : ''}" data-item-id="${item.id}" data-status="warning" ${isLockedBySubmission ? 'disabled' : ''}>เฝ้าระวัง</button>
+                            <button type="button" class="status-btn ${st.status === 'abnormal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="abnormal" ${isLockedBySubmission ? 'disabled' : ''}>ผิดปกติ</button>
                         </div>
                     </div>
                 </div>
                 <div class="item-remark-box ${needRemark ? '' : 'hidden'}" id="remarkBox_${item.id}">
-                    <input type="text" class="remark-input ${st.status === 'abnormal' ? 'is-abnormal' : ''}" id="remarkInput_${item.id}" data-item-id="${item.id}" placeholder="ระบุหมายเหตุ / อาการ *" value="${st.remark}" ${isReadOnlyApprover ? 'disabled' : ''}>
+                    <input type="text" class="remark-input ${st.status === 'abnormal' ? 'is-abnormal' : ''}" id="remarkInput_${item.id}" data-item-id="${item.id}" placeholder="ระบุหมายเหตุ / อาการ *" value="${st.remark}" ${isLockedBySubmission ? 'disabled' : ''}>
                 </div>
             `;
             card.appendChild(row);
@@ -248,7 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         checklistCategoriesContainer.appendChild(card);
 
-        if (!isReadOnlyApprover) {
+        if (!isLockedBySubmission) {
             bindEvents();
         }
     }
@@ -256,6 +270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function bindEvents() {
         checklistCategoriesContainer.querySelectorAll('.status-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                if (isLockedBySubmission) return;
                 const id = Number(btn.dataset.itemId);
                 const stat = btn.dataset.status;
                 if (!checklistState[id]) checklistState[id] = {};
@@ -281,6 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         checklistCategoriesContainer.querySelectorAll('.measurement-input').forEach(input => {
             input.addEventListener('input', () => {
+                if (isLockedBySubmission) return;
                 const id = Number(input.dataset.itemId);
                 const seq = Number(input.dataset.seq);
                 const val = input.value;
@@ -328,6 +344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         checklistCategoriesContainer.querySelectorAll('.remark-input').forEach(input => {
             input.addEventListener('input', () => {
+                if (isLockedBySubmission) return;
                 const id = Number(input.dataset.itemId);
                 if (!checklistState[id]) checklistState[id] = {};
                 checklistState[id].remark = input.value;
@@ -347,7 +364,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (resetFormBtn) {
         resetFormBtn.addEventListener('click', () => {
-            if (!currentMachine || isReadOnlyApprover) return;
+            if (!currentMachine || isLockedBySubmission) return;
             Object.keys(checklistState).forEach(id => {
                 checklistState[id] = { status: '', measurementValue: '', remark: '' };
             });
@@ -359,7 +376,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     inspectionFormContainer.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!currentMachine || isReadOnlyApprover) return;
+        if (!currentMachine || isLockedBySubmission) {
+            showToast('รายการนี้ถูกส่งแล้ว ไม่สามารถแก้ไขได้จนกว่าผู้อนุมัติจะกดไม่อนุมัติ', 'warning');
+            return;
+        }
         const inspector = inspectorNameInput.value.trim();
         if (!inspector) { showToast('กรุณากรอกชื่อช่างผู้ตรวจสอบ', 'error'); inspectorNameInput.focus(); return; }
 
@@ -406,9 +426,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             summary: { normal: normalCount, warning: warningCount, abnormal: abnormalCount }
         };
 
-        await DEIStorage.upsertInspection(record);
+        const res = await DEIStorage.upsertInspection(record);
+        if (res && res.success === false) {
+            showToast(res.message || 'ไม่สามารถบันทึกซ้ำได้', 'error');
+            return;
+        }
+
         await DEIStorage.renderSharedHeaderAndDashboard();
-        buildingSelect.dispatchEvent(new Event('change'));
+        await buildingSelect.dispatchEvent(new Event('change'));
+        await openForm(currentMachine);
 
         showToast('บันทึกผลการตรวจสอบสำเร็จ!', 'success');
     });

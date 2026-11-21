@@ -331,6 +331,36 @@
                 admin: 'ผู้ดูแลระบบ'
             };
 
+            function parseCodeNumber(code) {
+                const clean = String(code || '').trim().toUpperCase();
+                const match = clean.match(/^(.*?)(\d+)$/);
+                if (match) {
+                    return {
+                        prefix: match[1],
+                        num: parseInt(match[2], 10),
+                        raw: clean
+                    };
+                }
+                return {
+                    prefix: clean,
+                    num: Number.MAX_SAFE_INTEGER,
+                    raw: clean
+                };
+            }
+
+            function compareMachineCodeNaturally(a, b) {
+                const partA = parseCodeNumber(a.code);
+                const partB = parseCodeNumber(b.code);
+
+                if (partA.prefix !== partB.prefix) {
+                    return partA.prefix.localeCompare(partB.prefix, 'en', { numeric: true });
+                }
+                if (partA.num !== partB.num) {
+                    return partA.num - partB.num;
+                }
+                return partA.raw.localeCompare(partB.raw, 'en', { numeric: true });
+            }
+
             async function renderUsersApprovalTable() {
                 try {
                     const res = await fetch('/api/admin/users');
@@ -378,10 +408,12 @@
 
             function renderMachinesTable() {
                 const selectedVal = machineBuildingInput.value;
-                const allList = DEIStorage.getMachines();
+                const allList = DEIStorage.getMachines() || [];
                 const list = (!selectedVal || selectedVal === 'ALL')
-                    ? allList
+                    ? [...allList]
                     : allList.filter(m => m.building === selectedVal);
+
+                list.sort(compareMachineCodeNaturally);
 
                 if (!list.length) {
                     machinesBody.innerHTML = '<tr><td colspan="4">ไม่มีข้อมูลเครื่องจักรในตัวเลือกนี้</td></tr>';
@@ -412,7 +444,7 @@
                     return;
                 }
 
-                const list = DEIStorage.getMachinesByBuilding(b);
+                const list = [...(DEIStorage.getMachinesByBuilding(b) || [])].sort(compareMachineCodeNaturally);
                 targetMachineSelect.disabled = false;
                 targetMachineSelect.innerHTML = `<option value="">-- เลือกเครื่องจักรในอาคาร ${b} --</option>`;
                 list.forEach(m => {

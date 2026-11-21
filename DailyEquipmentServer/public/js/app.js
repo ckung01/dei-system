@@ -25,6 +25,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         10: { min: 35.0, max: 55.0, name: 'กระแสไฟฟ้า' }
     };
 
+    function getUniqueMachinesForBuilding(buildingValue) {
+        const targetBuilding = String(buildingValue || '').trim().toUpperCase();
+        const rawList = DEIStorage.getMachinesByBuilding(buildingValue) || [];
+        const seen = new Set();
+
+        return rawList.filter(m => {
+            if (!m) return false;
+            const mBuilding = String(m.building || '').trim().toUpperCase();
+            if (targetBuilding && mBuilding && mBuilding !== targetBuilding) return false;
+
+            const codeKey = String(m.code || '').trim().toUpperCase();
+            const nameKey = String(m.name || '').trim().toLowerCase();
+            const uniqueKey = codeKey || `${mBuilding}|${nameKey}`;
+
+            if (!uniqueKey || seen.has(uniqueKey)) return false;
+            seen.add(uniqueKey);
+            return true;
+        });
+    }
+
     function getFlatQuestions() {
         const cats = DEIStorage.getChecklistCategories();
         return cats.flatMap((cat) =>
@@ -41,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // รออนุมัติ = ต่อท้าย [รออนุมัติ]
     // ยังไม่ตรวจ หรือ ไม่อนุมัติ = ตัวอักษรสีดำ ไม่มี [รออนุมัติ]
     function getOptionDisplay(m, todayInspections) {
-        const rec = todayInspections.find(i => i.machineCode === m.code);
+        const rec = todayInspections.find(i => String(i.machineCode || '').trim().toUpperCase() === String(m.code || '').trim().toUpperCase());
         if (!rec) {
             return { text: `${m.code} - ${m.name}`, color: '#0f172a' };
         }
@@ -85,15 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const rawMachines = DEIStorage.getMachinesByBuilding(b) || [];
-        const seenCodes = new Set();
-        const machines = rawMachines.filter(m => {
-            const codeKey = String(m.code || '').trim().toUpperCase();
-            if (!codeKey || seenCodes.has(codeKey)) return false;
-            seenCodes.add(codeKey);
-            return true;
-        });
-
+        const machines = getUniqueMachinesForBuilding(b);
         const todayISO = DEIStorage.getTodayISO();
 
         machineSelect.disabled = false;

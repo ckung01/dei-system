@@ -1,458 +1,491 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการระบบ (Admin) - ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-    <style>
-        .admin-section {
-            margin-bottom: 24px;
-        }
-        .admin-grid-3 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 14px;
-            margin-bottom: 14px;
-        }
-        .admin-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 14px;
-            font-size: 0.92rem;
-        }
-        .admin-table th, .admin-table td {
-            border: 1px solid #e2e8f0;
-            padding: 10px 12px;
-            text-align: left;
-            vertical-align: middle;
-        }
-        .admin-table th {
-            background: #f8fafc;
-            color: #0f172a;
-            font-weight: 600;
-        }
-        .btn-sm {
-            padding: 6px 10px;
-            font-size: 0.82rem;
-            border-radius: 6px;
-        }
-        .btn-approve-sm {
-            background: #16a34a;
-            color: #ffffff;
-            border: none;
-            cursor: pointer;
-        }
-        .btn-danger {
-            background: #dc2626;
-            color: #ffffff;
-            border: none;
-            cursor: pointer;
-        }
-        .btn-warning-sm {
-            background: #f59e0b;
-            color: #ffffff;
-            border: none;
-            cursor: pointer;
-            margin-right: 6px;
-        }
-        .badge-wait {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 999px;
-            font-size: 0.8rem;
-            background: #fef3c7;
-            color: #b45309;
-            font-weight: 500;
-        }
-        .badge-ok {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 999px;
-            font-size: 0.8rem;
-            background: #dcfce7;
-            color: #15803d;
-            font-weight: 500;
-        }
-        .checkbox-inline {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding-top: 26px;
-        }
-    </style>
-</head>
-<body>
-    <header class="main-header">
-        <div class="container header-content">
-            <div class="header-left">
-                <div class="factory-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
-                        <path d="M22 22H2V10l7-3v4l7-3v4h6v10zM4 20h16v-6h-6v-3.17l-7 3V9.83l-3 1.29V20zm14-18h2v7h-2V2zm-4 2h2v5h-2V4z"/>
-                    </svg>
-                </div>
-                <div class="header-titles">
-                    <h1>ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</h1>
-                    <p>Daily Equipment Inspection System - Admin Panel</p>
-                </div>
-            </div>
-            <div class="header-right">
-                <div class="current-date" id="headerCurrentDate">กำลังโหลดวันที่...</div>
-                <div class="user-role-badge">
-                    <span class="role-dot"></span> ผู้ดูแลระบบ
-                </div>
-                <button type="button" class="btn-logout">ออกจากระบบ</button>
-            </div>
-        </div>
-    </header>
+const express = require('express');
+const mysql = require('mysql2');
+const cors = require('cors');
+const path = require('path');
+const app = express();
 
-    <nav class="main-nav">
-        <div class="container nav-list">
-            <a href="index.html" class="nav-item">ตรวจเช็กประจำวัน</a>
-            <a href="approval.html" class="nav-item">รายการรออนุมัติ</a>
-            <a href="history.html" class="nav-item">ประวัติการตรวจสอบ</a>
-            <a href="admin.html" class="nav-item active">จัดการระบบ (Admin)</a>
-        </div>
-    </nav>
+app.use(express.json());
+app.use(cors());
+app.use(express.static(path.join(__dirname, 'public')));
 
-    <main class="container main-container">
-        <!-- ส่วนอนุมัติผู้ใช้งานที่สมัครใหม่ -->
-        <section class="card-box admin-section">
-            <h3 class="box-title">อนุมัติผู้ใช้งานที่สมัครใหม่</h3>
-            <div style="overflow-x:auto;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>ชื่อ-นามสกุล</th>
-                            <th>ยูสเซอร์</th>
-                            <th>อีเมล</th>
-                            <th style="width:120px;">สิทธิ์</th>
-                            <th style="width:120px;">สถานะ</th>
-                            <th style="width:120px;">การอนุมัติ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersApprovalTableBody">
-                        <tr><td colspan="6">กำลังโหลดรายชื่อผู้ใช้งาน...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+const db = mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'dei_system',
+    dateStrings: true
+});
 
-        <!-- ส่วนจัดการเครื่องจักร -->
-        <section class="card-box admin-section">
-            <h3 class="box-title">จัดการรายการเครื่องจักร (เพิ่ม / ลบ)</h3>
-            <form id="addMachineForm">
-                <div class="admin-grid-3">
-                    <div class="form-group">
-                        <label for="machineCodeInput">รหัสเครื่องจักร <span class="required">*</span></label>
-                        <input type="text" id="machineCodeInput" class="form-control" placeholder="เช่น A-M013" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="machineBuildingInput">อาคาร <span class="required">*</span></label>
-                        <select id="machineBuildingInput" class="form-control" required>
-                            <option value="A">อาคาร A</option>
-                            <option value="B">อาคาร B</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="machineNameInput">ชื่อเครื่องจักร <span class="required">*</span></label>
-                        <input type="text" id="machineNameInput" class="form-control" placeholder="ระบุชื่อเครื่องจักร" required>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary">+ เพิ่มเครื่องจักร</button>
-            </form>
+db.connect(err => {
+    if (err) throw err;
+    console.log('Connected to MySQL Database successfully!');
+});
 
-            <div style="overflow-x:auto;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th style="width:120px;">รหัส</th>
-                            <th style="width:100px;">อาคาร</th>
-                            <th>ชื่อเครื่องจักร</th>
-                            <th style="width:110px;">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="machinesTableBody">
-                        <tr><td colspan="4">กำลังโหลดข้อมูล...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+const USERNAME_REGEX = /^[A-Za-z0-9._-]+$/;
 
-        <!-- ส่วนจัดการคำถามตรวจเช็ก -->
-        <section class="card-box admin-section">
-            <h3 class="box-title" id="questionFormTitle">จัดการข้อคำถามตรวจเช็ก (เพิ่มข้อใหม่ / แก้ไข / ลบ)</h3>
-            <form id="questionForm">
-                <input type="hidden" id="editingQuestionId" value="">
-                <div class="admin-grid-3">
-                    <div class="form-group">
-                        <label for="qCatSelect">หมวดการตรวจสอบ <span class="required">*</span></label>
-                        <select id="qCatSelect" class="form-control" required>
-                            <option value="01|ระบบแรงดันและระบบท่อ">หมวด 01: ระบบแรงดันและระบบท่อ</option>
-                            <option value="02|ระบบทำความเย็นและอุณหภูมิ">หมวด 02: ระบบทำความเย็นและอุณหภูมิ</option>
-                            <option value="03|ระบบไฟฟ้าและการควบคุม">หมวด 03: ระบบไฟฟ้าและการควบคุม</option>
-                            <option value="04|ระบบทั่วไปและความปลอดภัย" selected>หมวด 04: ระบบทั่วไปและความปลอดภัย</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="qSeqInput">ลำดับข้อที่ (เช่น 16)</label>
-                        <input type="number" id="qSeqInput" class="form-control" min="1" value="16" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="qTitleInput">ข้อความคำถาม <span class="required">*</span></label>
-                        <input type="text" id="qTitleInput" class="form-control" placeholder="เช่น ตรวจสอบระดับเสียงรบกวน (dB)" required>
-                    </div>
-                </div>
-
-                <div class="admin-grid-3">
-                    <div class="form-group">
-                        <label for="qUnitInput">หน่วยค่าตรวจวัด (ถ้ามี)</label>
-                        <input type="text" id="qUnitInput" class="form-control" placeholder="เช่น bar, °C, V, dB">
-                    </div>
-                    <div class="form-group">
-                        <label for="qPlaceholderInput">ตัวอย่างค่าที่กรอก (ถ้ามี)</label>
-                        <input type="text" id="qPlaceholderInput" class="form-control" placeholder="เช่น 75">
-                    </div>
-                    <div class="form-group checkbox-inline">
-                        <input type="checkbox" id="qHasMeasurementInput">
-                        <label for="qHasMeasurementInput" style="margin:0;cursor:pointer;">มีช่องกรอกค่าตัวเลขตรวจวัด</label>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <button type="submit" id="saveQuestionBtn" class="btn btn-success">+ บันทึกข้อคำถาม</button>
-                    <button type="button" id="cancelEditQuestionBtn" class="btn btn-secondary hidden">ยกเลิกการแก้ไข</button>
-                </div>
-            </form>
-
-            <div style="overflow-x:auto;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th style="width:70px;">ข้อที่</th>
-                            <th style="width:220px;">หมวด</th>
-                            <th>หัวข้อคำถาม</th>
-                            <th style="width:110px;">ค่าตรวจวัด</th>
-                            <th style="width:160px;">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="questionsTableBody">
-                        <tr><td colspan="5">กำลังโหลดข้อมูล...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <div id="toastContainer" class="toast-container"></div>
-
-    <script src="js/auth.js"></script>
-    <script src="js/data.js"></script>
-    <script>
-        (async function () {
-            const user = DEIAuth.enforceAccess(['admin']);
-            if (!user) return;
-
-            const headerDate = document.getElementById('headerCurrentDate');
-            if (headerDate) headerDate.textContent = DEIStorage.formatThaiFullDate(DEIStorage.getTodayISO());
-
-            const usersBody = document.getElementById('usersApprovalTableBody');
-            const machinesBody = document.getElementById('machinesTableBody');
-            const questionsBody = document.getElementById('questionsTableBody');
-            const questionForm = document.getElementById('questionForm');
-            const editingQuestionId = document.getElementById('editingQuestionId');
-            const questionFormTitle = document.getElementById('questionFormTitle');
-            const cancelEditQuestionBtn = document.getElementById('cancelEditQuestionBtn');
-
-            const roleNameMap = {
-                inspector: 'ผู้ตรวจสอบ',
-                approver: 'ผู้อนุมัติ',
-                admin: 'ผู้ดูแลระบบ'
-            };
-
-            async function renderUsersApprovalTable() {
-                try {
-                    const res = await fetch('/api/admin/users');
-                    const list = await res.json();
-                    if (!Array.isArray(list) || !list.length) {
-                        usersBody.innerHTML = '<tr><td colspan="6">ไม่มีข้อมูลผู้ใช้งาน</td></tr>';
-                        return;
-                    }
-                    usersBody.innerHTML = list.map(u => {
-                        const isApproved = u.approvalStatus === 'approved';
-                        return `
-                            <tr>
-                                <td><strong>${u.fullName || '-'}</strong></td>
-                                <td>${u.username}</td>
-                                <td>${u.email || '-'}</td>
-                                <td>${roleNameMap[u.role] || u.role}</td>
-                                <td>${isApproved ? '<span class="badge-ok">อนุมัติแล้ว</span>' : '<span class="badge-wait">รออนุมัติ</span>'}</td>
-                                <td>
-                                    ${isApproved
-                                        ? '<span style="color:#64748b;font-size:0.85rem;">ใช้งานได้</span>'
-                                        : `<button type="button" class="btn-sm btn-approve-sm" onclick="handleApproveUser(${u.id}, '${u.username}')">อนุมัติ</button>`}
-                                </td>
-                            </tr>
-                        `;
-                    }).join('');
-                } catch (err) {
-                    usersBody.innerHTML = '<tr><td colspan="6">โหลดข้อมูลผู้ใช้งานไม่สำเร็จ</td></tr>';
-                }
-            }
-
-            window.handleApproveUser = async function (id, username) {
-                try {
-                    const res = await fetch(`/api/admin/users/${id}/approve`, { method: 'PUT' });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                        showToast(`อนุมัติบัญชี ${username} เรียบร้อยแล้ว`, 'success');
-                        renderUsersApprovalTable();
-                    } else {
-                        showToast(data.message || 'อนุมัติไม่สำเร็จ', 'error');
-                    }
-                } catch (err) {
-                    showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', 'error');
-                }
-            };
-
-            function renderMachinesTable() {
-                const list = DEIStorage.getMachines();
-                if (!list.length) {
-                    machinesBody.innerHTML = '<tr><td colspan="4">ไม่มีข้อมูลเครื่องจักร</td></tr>';
-                    return;
-                }
-                machinesBody.innerHTML = list.map(m => `
-                    <tr>
-                        <td><strong>${m.code}</strong></td>
-                        <td>อาคาร ${m.building}</td>
-                        <td>${m.name}</td>
-                        <td>
-                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteMachine(${m.id}, '${m.code}')">ลบ</button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
-
-            function renderQuestionsTable() {
-                const list = DEIStorage.getQuestions();
-                if (!list.length) {
-                    questionsBody.innerHTML = '<tr><td colspan="5">ไม่มีข้อมูลข้อคำถาม</td></tr>';
-                    return;
-                }
-                questionsBody.innerHTML = list.map((q, index) => `
-                    <tr>
-                        <td><strong>${q.seq || (index + 1)}</strong></td>
-                        <td>${q.catCode} - ${q.catName}</td>
-                        <td>${q.title}</td>
-                        <td>${q.hasMeasurement ? (q.unit || 'มีค่า') : '-'}</td>
-                        <td>
-                            <button type="button" class="btn-sm btn-warning-sm" onclick="handleEditQuestion(${q.id})">แก้ไข</button>
-                            <button type="button" class="btn-sm btn-danger" onclick="handleDeleteQuestion(${q.id})">ลบ</button>
-                        </td>
-                    </tr>
-                `).join('');
-            }
-
-            window.handleDeleteMachine = async function (id, code) {
-                if (!confirm(`ยืนยันลบเครื่องจักร ${code} ?`)) return;
-                const res = await DEIStorage.deleteMachine(id);
-                if (res.success) {
-                    showToast(`ลบเครื่องจักร ${code} แล้ว`, 'success');
-                    renderMachinesTable();
-                } else {
-                    showToast(res.message || 'ลบไม่สำเร็จ', 'error');
-                }
-            };
-
-            window.handleEditQuestion = function (id) {
-                const q = DEIStorage.getQuestions().find(item => item.id === id);
-                if (!q) return;
-                editingQuestionId.value = q.id;
-                questionFormTitle.textContent = `แก้ไขข้อคำถาม (ID: ${q.id})`;
-                document.getElementById('qCatSelect').value = `${q.catCode}|${q.catName}`;
-                document.getElementById('qSeqInput').value = q.seq || 1;
-                document.getElementById('qTitleInput').value = q.title;
-                document.getElementById('qHasMeasurementInput').checked = Boolean(q.hasMeasurement);
-                document.getElementById('qUnitInput').value = q.unit || '';
-                document.getElementById('qPlaceholderInput').value = q.placeholder || '';
-                cancelEditQuestionBtn.classList.remove('hidden');
-                questionForm.scrollIntoView({ behavior: 'smooth' });
-            };
-
-            window.handleDeleteQuestion = async function (id) {
-                if (!confirm('ยืนยันลบข้อคำถามนี้?')) return;
-                const res = await DEIStorage.deleteQuestion(id);
-                if (res.success) {
-                    showToast('ลบข้อคำถามเรียบร้อย', 'success');
-                    renderQuestionsTable();
-                } else {
-                    showToast(res.message || 'ลบไม่สำเร็จ', 'error');
-                }
-            };
-
-            function resetQuestionForm() {
-                editingQuestionId.value = '';
-                questionFormTitle.textContent = 'จัดการข้อคำถามตรวจเช็ก (เพิ่มข้อใหม่ / แก้ไข / ลบ)';
-                questionForm.reset();
-                const nextSeq = DEIStorage.getQuestions().length + 1;
-                document.getElementById('qSeqInput').value = nextSeq;
-                cancelEditQuestionBtn.classList.add('hidden');
-            }
-
-            cancelEditQuestionBtn.addEventListener('click', resetQuestionForm);
-
-            document.getElementById('addMachineForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const code = document.getElementById('machineCodeInput').value.trim();
-                const building = document.getElementById('machineBuildingInput').value;
-                const name = document.getElementById('machineNameInput').value.trim();
-
-                const res = await DEIStorage.addMachine({ code, building, name });
-                if (res.success) {
-                    showToast(`เพิ่มเครื่องจักร ${code} สำเร็จ`, 'success');
-                    e.target.reset();
-                    renderMachinesTable();
-                } else {
-                    showToast(res.message || 'เพิ่มเครื่องจักรไม่สำเร็จ', 'error');
+async function sendVerificationEmail(toEmail, code, fullName) {
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: Number(process.env.SMTP_PORT || 587),
+                secure: process.env.SMTP_SECURE === 'true',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
                 }
             });
+            await transporter.sendMail({
+                from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                to: toEmail,
+                subject: 'รหัสยืนยันการรีเซ็ตรหัสผ่าน - ระบบตรวจเช็กเครื่องจักรประจำวัน',
+                text: `สวัสดีคุณ ${fullName || ''}\nรหัสยืนยันสำหรับรีเซ็ตรหัสผ่านของคุณคือ: ${code}\nรหัสนี้มีอายุ 15 นาที`
+            });
+            return { sentViaEmail: true };
+        } catch (e) {
+            console.error('Send email error:', e.message);
+        }
+    }
+    return { sentViaEmail: false };
+}
 
-            questionForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const [catCode, catName] = document.getElementById('qCatSelect').value.split('|');
-                const payload = {
-                    catCode,
-                    catName,
-                    seq: Number(document.getElementById('qSeqInput').value) || 1,
-                    title: document.getElementById('qTitleInput').value.trim(),
-                    hasMeasurement: document.getElementById('qHasMeasurementInput').checked,
-                    unit: document.getElementById('qUnitInput').value.trim(),
-                    placeholder: document.getElementById('qPlaceholderInput').value.trim()
-                };
+function seedDefaultQuestionsForMachine(machineCode, callback) {
+    const copySql = `
+        INSERT INTO machine_questions (machine_code, cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder)
+        SELECT ?, cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder
+        FROM questions
+        ORDER BY seq ASC, id ASC
+    `;
+    db.query(copySql, [machineCode], callback);
+}
 
-                const id = editingQuestionId.value;
-                const res = id
-                    ? await DEIStorage.updateQuestion(id, payload)
-                    : await DEIStorage.addQuestion(payload);
+// สมัครสมาชิก (username ห้ามมีภาษาไทย ใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข และอักขระพิเศษ)
+app.post('/api/auth/register', (req, res) => {
+    const { username, email, password, fullName, role } = req.body;
+    const allowedRoles = ['inspector', 'approver', 'admin'];
+    const safeRole = allowedRoles.includes(role) ? role : 'inspector';
 
-                if (res.success) {
-                    showToast(id ? 'อัปเดตข้อคำถามสำเร็จ' : 'เพิ่มข้อคำถามใหม่สำเร็จ', 'success');
-                    resetQuestionForm();
-                    renderQuestionsTable();
-                } else {
-                    showToast(res.message || 'บันทึกข้อคำถามไม่สำเร็จ', 'error');
+    if (!username || !email || !password || !fullName) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+    }
+
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!USERNAME_REGEX.test(cleanUsername)) {
+        return res.status(400).json({
+            success: false,
+            message: 'ชื่อผู้ใช้งานใส่ได้เฉพาะภาษาอังกฤษ ตัวเลข และอักขระพิเศษ ห้ามใส่ภาษาไทยหรือเว้นวรรค'
+        });
+    }
+
+    db.query('SELECT id, username, email FROM users WHERE username = ? OR email = ?', [cleanUsername, cleanEmail], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+
+        if (rows.length > 0) {
+            const dupUsername = rows.some(r => r.username === cleanUsername);
+            const dupEmail = rows.some(r => String(r.email || '').toLowerCase() === cleanEmail);
+            if (dupUsername) {
+                return res.status(409).json({ success: false, message: 'ชื่อผู้ใช้งาน (Username) นี้ถูกใช้ไปแล้ว กรุณาตั้งใหม่' });
+            }
+            if (dupEmail) {
+                return res.status(409).json({ success: false, message: 'อีเมลนี้ถูกใช้งานกับบัญชีอื่นแล้ว (1 อีเมลใช้ได้ 1 ยูสเซอร์)' });
+            }
+        }
+
+        const sql = `
+            INSERT INTO users (username, email, password, full_name, role, approval_status)
+            VALUES (?, ?, ?, ?, ?, 'pending')
+        `;
+        db.query(sql, [cleanUsername, cleanEmail, password, fullName.trim(), safeRole], (insertErr, result) => {
+            if (insertErr) {
+                if (insertErr.code === 'ER_DUP_ENTRY') {
+                    return res.status(409).json({ success: false, message: 'ยูสเซอร์หรืออีเมลนี้มีอยู่ในระบบแล้ว' });
+                }
+                return res.status(500).json({ success: false, message: insertErr.message });
+            }
+            res.json({
+                success: true,
+                user: {
+                    id: result.insertId,
+                    username: cleanUsername,
+                    email: cleanEmail,
+                    fullName: fullName.trim(),
+                    role: safeRole,
+                    approvalStatus: 'pending'
                 }
             });
+        });
+    });
+});
 
-            await DEIStorage.init();
-            resetQuestionForm();
-            renderUsersApprovalTable();
-            renderMachinesTable();
-            renderQuestionsTable();
-        })();
-    </script>
-</body>
-</html>
+app.get('/api/auth/approval-status', (req, res) => {
+    const username = String(req.query.username || '').trim();
+    const email = String(req.query.email || '').trim().toLowerCase();
+
+    if (!username && !email) {
+        return res.status(400).json({ success: false, message: 'กรุณาระบุ username หรือ email' });
+    }
+
+    const sql = `
+        SELECT id, username, email, full_name, role, approval_status
+        FROM users
+        WHERE username = ? OR LOWER(email) = ?
+        LIMIT 1
+    `;
+    db.query(sql, [username, email], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลผู้ใช้งาน' });
+        }
+
+        const u = rows[0];
+        res.json({
+            success: true,
+            approvalStatus: u.approval_status || 'pending',
+            user: {
+                id: u.id,
+                username: u.username,
+                email: u.email,
+                fullName: u.full_name,
+                role: u.role,
+                approvalStatus: u.approval_status || 'pending'
+            }
+        });
+    });
+});
+
+app.post('/api/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
+    }
+
+    const sql = 'SELECT id, username, email, full_name, role, approval_status FROM users WHERE username = ? AND password = ? LIMIT 1';
+    db.query(sql, [username.trim(), password], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(401).json({ success: false, message: 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง' });
+        }
+
+        const u = rows[0];
+        if ((u.approval_status || 'pending') !== 'approved') {
+            return res.status(403).json({
+                success: false,
+                approvalStatus: u.approval_status || 'pending',
+                message: 'บัญชีนี้ยังรออนุมัติจากผู้ดูแลระบบ กรุณารอสักครู่จนกว่าจะได้รับการอนุมัติ'
+            });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: u.id,
+                username: u.username,
+                email: u.email,
+                fullName: u.full_name,
+                role: u.role,
+                approvalStatus: u.approval_status
+            }
+        });
+    });
+});
+
+app.get('/api/admin/users', (req, res) => {
+    const sql = 'SELECT id, username, email, full_name, role, approval_status, created_at FROM users ORDER BY id DESC';
+    db.query(sql, (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json(rows.map(r => ({
+            id: r.id,
+            username: r.username,
+            email: r.email,
+            fullName: r.full_name,
+            role: r.role,
+            approvalStatus: r.approval_status || 'pending',
+            createdAt: r.created_at
+        })));
+    });
+});
+
+app.put('/api/admin/users/:id/approve', (req, res) => {
+    const sql = "UPDATE users SET approval_status = 'approved' WHERE id = ?";
+    db.query(sql, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบผู้ใช้งานที่ต้องการอนุมัติ' });
+        }
+        res.json({ success: true });
+    });
+});
+
+app.post('/api/auth/forgot-password', (req, res) => {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกอีเมลที่ใช้สมัครสมาชิก' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    db.query('SELECT id, username, email, full_name FROM users WHERE LOWER(email) = ? LIMIT 1', [cleanEmail], async (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบผู้ใช้งานที่ใช้อีเมลนี้ในระบบ' });
+        }
+
+        const user = rows[0];
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const updateSql = 'UPDATE users SET reset_code = ?, reset_expires = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?';
+
+        db.query(updateSql, [code, user.id], async (upErr) => {
+            if (upErr) return res.status(500).json({ success: false, message: upErr.message });
+
+            const mailResult = await sendVerificationEmail(user.email, code, user.full_name);
+            res.json({
+                success: true,
+                message: mailResult.sentViaEmail
+                    ? `ส่งรหัสยืนยัน 6 หลักไปยังอีเมล ${user.email} เรียบร้อยแล้ว`
+                    : `สร้างรหัสยืนยันสำหรับอีเมล ${user.email} เรียบร้อยแล้ว`,
+                previewCode: mailResult.sentViaEmail ? undefined : code
+            });
+        });
+    });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกอีเมล รหัสยืนยัน และรหัสผ่านใหม่ให้ครบ' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim();
+
+    const sql = `
+        SELECT id, username FROM users
+        WHERE LOWER(email) = ? AND reset_code = ? AND (reset_expires IS NULL OR reset_expires >= NOW())
+        LIMIT 1
+    `;
+    db.query(sql, [cleanEmail, cleanCode], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(400).json({ success: false, message: 'รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว' });
+        }
+
+        const user = rows[0];
+        db.query('UPDATE users SET password = ?, reset_code = NULL, reset_expires = NULL WHERE id = ?', [newPassword, user.id], (upErr) => {
+            if (upErr) return res.status(500).json({ success: false, message: upErr.message });
+            res.json({
+                success: true,
+                username: user.username,
+                password: newPassword
+            });
+        });
+    });
+});
+
+// เครื่องจักร (เพิ่มทีละเครื่อง พร้อมสร้างคำถามพื้นฐาน 15 ข้อให้เครื่องนั้นอัตโนมัติ)
+app.get('/api/machines', (req, res) => {
+    db.query('SELECT * FROM machines ORDER BY code ASC', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows.map(r => ({ id: r.id, code: r.code, building: r.building, name: r.name })));
+    });
+});
+
+app.post('/api/machines', (req, res) => {
+    const { code, building, name } = req.body;
+    if (!code || !building || !name) {
+        return res.status(400).json({ success: false, message: 'กรุณาเลือกอาคารและกรอกข้อมูลเครื่องจักรให้ครบ' });
+    }
+
+    const cleanCode = code.trim();
+    const cleanBuilding = building.trim();
+    const cleanName = name.trim();
+
+    db.query('SELECT id FROM machines WHERE code = ?', [cleanCode], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length > 0) {
+            return res.status(409).json({ success: false, message: 'รหัสเครื่องจักรนี้มีอยู่แล้ว' });
+        }
+        db.query('INSERT INTO machines (code, building, name) VALUES (?, ?, ?)', [cleanCode, cleanBuilding, cleanName], (insertErr, result) => {
+            if (insertErr) return res.status(500).json({ success: false, message: insertErr.message });
+
+            seedDefaultQuestionsForMachine(cleanCode, (qErr) => {
+                if (qErr) return res.status(500).json({ success: false, message: qErr.message });
+                res.json({ success: true, id: result.insertId });
+            });
+        });
+    });
+});
+
+app.delete('/api/machines/:id', (req, res) => {
+    db.query('SELECT code FROM machines WHERE id = ?', [req.params.id], (selErr, rows) => {
+        if (selErr) return res.status(500).json({ success: false, message: selErr.message });
+        const machineCode = rows[0] ? rows[0].code : null;
+
+        db.query('DELETE FROM machines WHERE id = ?', [req.params.id], (err) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            if (machineCode) {
+                db.query('DELETE FROM machine_questions WHERE machine_code = ?', [machineCode], () => {});
+            }
+            res.json({ success: true });
+        });
+    });
+});
+
+// คำถามแยกตามเครื่องจักร (ถ้าเครื่องไหนยังไม่มีคำถามใน machine_questions ให้ seed จาก questions ให้อัตโนมัติ)
+app.get('/api/questions', (req, res) => {
+    const machineCode = String(req.query.machineCode || '').trim();
+
+    const mapRows = (rows) => rows.map(r => ({
+        id: r.id,
+        machineCode: r.machine_code || machineCode,
+        catCode: r.cat_code || '01',
+        catClass: r.cat_class || 'cat-01',
+        catName: r.cat_name || 'รายการตรวจสอบเครื่องจักร',
+        seq: r.seq,
+        title: r.title,
+        hasMeasurement: Boolean(r.has_measurement),
+        unit: r.unit || '',
+        placeholder: r.placeholder || ''
+    }));
+
+    if (!machineCode) {
+        return db.query('SELECT * FROM questions ORDER BY seq ASC, id ASC', (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(mapRows(rows));
+        });
+    }
+
+    db.query('SELECT * FROM machine_questions WHERE machine_code = ? ORDER BY seq ASC, id ASC', [machineCode], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (rows.length > 0) {
+            return res.json(mapRows(rows));
+        }
+
+        seedDefaultQuestionsForMachine(machineCode, (seedErr) => {
+            if (seedErr) return res.status(500).json({ error: seedErr.message });
+            db.query('SELECT * FROM machine_questions WHERE machine_code = ? ORDER BY seq ASC, id ASC', [machineCode], (afterErr, afterRows) => {
+                if (afterErr) return res.status(500).json({ error: afterErr.message });
+                res.json(mapRows(afterRows));
+            });
+        });
+    });
+});
+
+app.post('/api/questions', (req, res) => {
+    const { machineCode, seq, title, hasMeasurement, unit, placeholder } = req.body;
+    const cleanMachineCode = String(machineCode || '').trim();
+    if (!cleanMachineCode || !title) {
+        return res.status(400).json({ success: false, message: 'กรุณาเลือกเครื่องจักรและกรอกหัวข้อคำถาม' });
+    }
+
+    const sql = 'INSERT INTO machine_questions (machine_code, cat_code, cat_class, cat_name, seq, title, has_measurement, unit, placeholder) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    db.query(sql, [
+        cleanMachineCode,
+        '01',
+        'cat-01',
+        'รายการตรวจสอบเครื่องจักร',
+        Number(seq) || 1,
+        title.trim(),
+        hasMeasurement ? 1 : 0,
+        (unit || '').trim(),
+        (placeholder || '').trim()
+    ], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+app.put('/api/questions/:id', (req, res) => {
+    const { seq, title, hasMeasurement, unit, placeholder } = req.body;
+    if (!title) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกหัวข้อคำถาม' });
+    }
+
+    const sql = 'UPDATE machine_questions SET seq = ?, title = ?, has_measurement = ?, unit = ?, placeholder = ? WHERE id = ?';
+    db.query(sql, [
+        Number(seq) || 1,
+        title.trim(),
+        hasMeasurement ? 1 : 0,
+        (unit || '').trim(),
+        (placeholder || '').trim(),
+        req.params.id
+    ], (err) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true });
+    });
+});
+
+app.delete('/api/questions/:id', (req, res) => {
+    db.query('DELETE FROM machine_questions WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true });
+    });
+});
+
+// การตรวจเช็ก
+app.get('/api/inspections', (req, res) => {
+    db.query('SELECT * FROM inspections ORDER BY inspection_date DESC, inspection_time DESC', (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const formatted = results.map(row => ({
+            id: row.id,
+            inspectionDate: row.inspection_date,
+            inspectionTime: row.inspection_time,
+            building: row.building,
+            machineCode: row.machine_code,
+            machineName: row.machine_name,
+            inspectorName: row.inspector_name,
+            approvalStatus: row.approval_status,
+            approverName: row.approver_name,
+            approvedDate: row.approved_date,
+            approvedTime: row.approved_time,
+            items: JSON.parse(row.items_json || '[]'),
+            summary: {
+                normal: row.summary_normal || 0,
+                warning: row.summary_warning || 0,
+                abnormal: row.summary_abnormal || 0
+            }
+        }));
+        res.json(formatted);
+    });
+});
+
+app.post('/api/inspections', (req, res) => {
+    const data = req.body;
+    const itemsJson = JSON.stringify(data.items);
+
+    const checkQuery = 'SELECT id FROM inspections WHERE machine_code = ? AND inspection_date = ?';
+    db.query(checkQuery, [data.machineCode, data.inspectionDate], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        if (results.length > 0) {
+            const updateQuery = `UPDATE inspections SET inspection_time = ?, inspector_name = ?, items_json = ?, summary_normal = ?, summary_warning = ?, summary_abnormal = ?, approval_status = 'รออนุมัติ', approver_name = NULL WHERE machine_code = ? AND inspection_date = ?`;
+            db.query(updateQuery, [data.inspectionTime, data.inspectorName, itemsJson, data.summary.normal, data.summary.warning, data.summary.abnormal, data.machineCode, data.inspectionDate], (updateErr) => {
+                if (updateErr) return res.status(500).json({ error: updateErr.message });
+                res.json({ success: true, mode: 'updated' });
+            });
+        } else {
+            const insertQuery = `INSERT INTO inspections (id, inspection_date, inspection_time, building, machine_code, machine_name, inspector_name, items_json, summary_normal, summary_warning, summary_abnormal, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'รออนุมัติ')`;
+            db.query(insertQuery, [data.id, data.inspectionDate, data.inspectionTime, data.building, data.machineCode, data.machineName, data.inspectorName, itemsJson, data.summary.normal, data.summary.warning, data.summary.abnormal], (insertErr) => {
+                if (insertErr) return res.status(500).json({ error: insertErr.message });
+                res.json({ success: true, mode: 'created' });
+            });
+        }
+    });
+});
+
+app.put('/api/inspections/:id/approve', (req, res) => {
+    const { id } = req.params;
+    const { approverName, approvedDate, approvedTime } = req.body;
+    const query = `UPDATE inspections SET approval_status = 'อนุมัติแล้ว', approver_name = ?, approved_date = ?, approved_time = ? WHERE id = ?`;
+    db.query(query, [approverName, approvedDate, approvedTime, id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});

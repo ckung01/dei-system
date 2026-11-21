@@ -25,24 +25,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         10: { min: 35.0, max: 55.0, name: 'กระแสไฟฟ้า' }
     };
 
-    function getUniqueMachinesForBuilding(buildingValue) {
-        const targetBuilding = String(buildingValue || '').trim().toUpperCase();
-        const rawList = DEIStorage.getMachinesByBuilding(buildingValue) || [];
+    function normalizeCode(code) {
+        return String(code || '').trim().toUpperCase();
+    }
+
+    function normalizeBuilding(b) {
+        return String(b || '').trim().toUpperCase().replace(/^อาคาร\s*/i, '');
+    }
+
+    function getCleanMachinesByBuilding(buildingValue) {
+        const targetB = normalizeBuilding(buildingValue);
+        const allMachines = typeof DEIStorage.getMachines === 'function'
+            ? DEIStorage.getMachines()
+            : (DEIStorage.getMachinesByBuilding(buildingValue) || []);
+
         const seen = new Set();
+        const result = [];
 
-        return rawList.filter(m => {
-            if (!m) return false;
-            const mBuilding = String(m.building || '').trim().toUpperCase();
-            if (targetBuilding && mBuilding && mBuilding !== targetBuilding) return false;
+        for (const m of (allMachines || [])) {
+            if (!m) continue;
+            const mB = normalizeBuilding(m.building);
+            if (targetB && mB !== targetB) continue;
 
-            const codeKey = String(m.code || '').trim().toUpperCase();
+            const codeKey = normalizeCode(m.code);
             const nameKey = String(m.name || '').trim().toLowerCase();
-            const uniqueKey = codeKey || `${mBuilding}|${nameKey}`;
+            const key = codeKey || `${mB}__${nameKey}`;
 
-            if (!uniqueKey || seen.has(uniqueKey)) return false;
-            seen.add(uniqueKey);
-            return true;
-        });
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            result.push({
+                ...m,
+                code: String(m.code || '').trim(),
+                building: mB || targetB,
+                name: String(m.name || '').trim()
+            });
+        }
+
+        return result;
     }
 
     function getFlatQuestions() {
@@ -61,7 +80,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // รออนุมัติ = ต่อท้าย [รออนุมัติ]
     // ยังไม่ตรวจ หรือ ไม่อนุมัติ = ตัวอักษรสีดำ ไม่มี [รออนุมัติ]
     function getOptionDisplay(m, todayInspections) {
-        const rec = todayInspections.find(i => String(i.machineCode || '').trim().toUpperCase() === String(m.code || '').trim().toUpperCase());
+        const targetCode = normalizeCode(m.code);
+        const rec = todayInspections.find(i => normalizeCode(i.machineCode) === targetCode);
         if (!rec) {
             return { text: `${m.code} - ${m.name}`, color: '#0f172a' };
         }
@@ -105,11 +125,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const machines = getUniqueMachinesForBuilding(b);
+        const machines = getCleanMachinesByBuilding(b);
         const todayISO = DEIStorage.getTodayISO();
 
         machineSelect.disabled = false;
-        machineSelect.innerHTML = `<option value="">-- เลือกเครื่องจักรในอาคาร ${b} (${machines.length} เครื่อง) --</option>`;
+        machineSelect.innerHTML = `<option value="">-- เลือกเครื่องจักรในอาคาร ${normalizeBuilding(b)} (${machines.length} เครื่อง) --</option>`;
 
         let todayInspections = [];
         try {
@@ -119,14 +139,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('Error checking inspection status:', e);
         }
 
-        machines.forEach(m => {
+        const addedOptionValues = new Set();
+        for (const m of machines) {
+            const valKey = normalizeCode(m.code);
+            if (!valKey || addedOptionValues.has(valKey)) continue;
+            addedOptionValues.add(valKey);
+
             const disp = getOptionDisplay(m, todayInspections);
             const opt = document.createElement('option');
             opt.value = m.code;
             opt.textContent = disp.text;
             opt.style.color = disp.color;
             machineSelect.appendChild(opt);
-        });
+        }
     });
 
     searchMachineBtn.addEventListener('click', async () => {
@@ -135,7 +160,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!b) { showToast('กรุณาเลือกอาคาร', 'warning'); return; }
         if (!code) { showToast('กรุณาเลือกเครื่องจักร', 'warning'); return; }
 
-        const machine = DEIStorage.getMachineByCode(code);
+        const listForBuilding = getCleanMachinesByBuilding(b);
+        const machine = listForBuilding.find(m => normalizeCode(m.code) === normalizeCode(code)) || DEIStorage.getMachineByCode(code);
         if (!machine) return;
 
         currentMachine = machine;
@@ -158,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const allInspections = await DEIStorage.getInspections();
             existing = allInspections.find(i => {
                 const dbDate = i.inspectionDate ? String(i.inspectionDate).split('T')[0] : '';
-                return i.machineCode === machine.code && dbDate === todayISO;
+                return normalizeCode(i.machineCode) === normalizeCode(machine.code) && dbDate === todayISO;
             }) || null;
         } catch (e) {
             console.error('Error finding existing inspection:', e);
@@ -169,7 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             checklistState[i.id] = { status: '', measurementValue: '', remark: '' };
         });
 
-        document.getElementById('detailBuilding').textContent = `อาคาร ${machine.building}`;
+        document.getElementById('detailBuilding').textContent = `อาคาร ${normalizeBuilding(machine.building)}`;
         document.getElementById('detailMachineCode').textContent = machine.code;
         document.getElementById('detailMachineName').textContent = machine.name;
         document.getElementById('detailInspectDate').textContent = DEIStorage.formatThaiFullDate(todayISO);

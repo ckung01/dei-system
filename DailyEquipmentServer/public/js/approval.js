@@ -1,10 +1,10 @@
 /**
-- Daily Equipment Inspection System - หน้าที่สอง: รายการรออนุมัติ (approval.html)
-- ฉบับปรับปรุงรองรับ Server API (Async/Await) 100%
+ * Daily Equipment Inspection System - หน้าที่สอง: รายการรออนุมัติ (approval.html)
+ * ฉบับปรับปรุงรองรับ Server API (Async/Await) 100% + ปุ่มไม่อนุมัติพร้อมช่องกรอกเหตุผล
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
-    DEIStorage.init();
+    await DEIStorage.init();
     await DEIStorage.renderSharedHeaderAndDashboard();
 
     const pendingListContainer = document.getElementById('pendingListContainer');
@@ -24,17 +24,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const okDetailModalBtn = document.getElementById('okDetailModalBtn');
 
     let currentTargetId = null;
+    let currentModalMode = 'approve'; // 'approve' | 'reject'
+
+    function getSavedApprover() {
+        if (typeof DEIStorage.getSettings === 'function') {
+            return DEIStorage.getSettings().lastSelectedApprover || '';
+        }
+        return localStorage.getItem('dei_last_approver') || '';
+    }
+
+    function saveSelectedApprover(name) {
+        if (typeof DEIStorage.updateSettings === 'function') {
+            DEIStorage.updateSettings({ lastSelectedApprover: name });
+        } else {
+            localStorage.setItem('dei_last_approver', name);
+        }
+    }
 
     async function renderLists() {
-        // ดึงข้อมูลผ่าน Server API แบบ async/await
         const all = await DEIStorage.getInspections();
-  const todayISO = DEIStorage.getTodayISO(); // ดึงวันที่ปัจจุบัน (เช่น '2026-11-18')
+        const todayISO = DEIStorage.getTodayISO();
 
-  // กรองเฉพาะรายการที่เป็นของ "วันนี้" และรออนุมัติ
-  const pending = all.filter(i => i.approvalStatus === 'รออนุมัติ' && i.inspectionDate === todayISO);
-  const approved = all.filter(i => i.approvalStatus === 'อนุมัติแล้ว' && i.inspectionDate === todayISO);
-        pendingCountBadge.textContent = pending.length;
-        approvedCountBadge.textContent = approved.length;
+        const pending = all.filter(i => i.approvalStatus === 'รออนุมัติ' && String(i.inspectionDate || '').split('T')[0] === todayISO);
+        const approved = all.filter(i => (i.approvalStatus === 'อนุมัติแล้ว' || i.approvalStatus === 'ไม่อนุมัติ') && String(i.inspectionDate || '').split('T')[0] === todayISO);
+
+        if (pendingCountBadge) pendingCountBadge.textContent = pending.length;
+        if (approvedCountBadge) approvedCountBadge.textContent = approved.length;
 
         // 1. Render รายการรออนุมัติ
         if (pending.length === 0) {
@@ -43,7 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             pendingListContainer.innerHTML = pending.map(r => createPendingCardHTML(r)).join('');
         }
 
-        // 2. Render รายการที่อนุมัติแล้ว
+        // 2. Render รายการที่ดำเนินการแล้ว (อนุมัติแล้ว / ไม่อนุมัติ)
         if (approved.length === 0) {
             approvedListContainer.innerHTML = `<div class="empty-data-card">ยังไม่มีรายการที่อนุมัติแล้ว</div>`;
         } else {
@@ -63,36 +78,44 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const listOnDate = groupedApproved[dateISO];
                 listOnDate.sort((a, b) => a.machineCode.localeCompare(b.machineCode));
 
-                const itemsRows = listOnDate.map((rec, idx) => `
-                    <div class="compact-history-row is-approved">
-                        <div class="compact-col-no">${idx + 1}</div>
-                        <div class="compact-col-machine">
-                            <span class="text-blue font-weight-600">อาคาร ${rec.building} | ${rec.machineCode}</span>
-                            <span class="compact-machine-name">${rec.machineName}</span>
+                const itemsRows = listOnDate.map((rec, idx) => {
+                    const isRejected = rec.approvalStatus === 'ไม่อนุมัติ';
+                    const statusPillHTML = isRejected
+                        ? `<span class="compact-pill" style="background:#fee2e2;color:#dc2626;">ไม่อนุมัติ</span>`
+                        : `<span class="compact-pill approved">อนุมัติแล้ว</span>`;
+
+                    return `
+                        <div class="compact-history-row ${isRejected ? '' : 'is-approved'}">
+                            <div class="compact-col-no">${idx + 1}</div>
+                            <div class="compact-col-machine">
+                                <span class="text-blue font-weight-600">อาคาร ${rec.building} | ${rec.machineCode}</span>
+                                <span class="compact-machine-name">${rec.machineName}</span>
+                            </div>
+                            <div class="compact-col-info">
+                                <span>เวลา: ${rec.inspectionTime} น. | ช่าง: ${rec.inspectorName}</span>
+                                <span>ผู้อนุมัติ: <strong class="${isRejected ? 'text-red' : 'text-green'}">${rec.approverName || '-'}</strong></span>
+                                ${rec.rejectReason ? `<span style="color:#dc2626;">เหตุผล: ${rec.rejectReason}</span>` : ''}
+                            </div>
+                            <div class="compact-col-stats">
+                                <span class="mini-stat normal">ปกติ: ${rec.summary.normal}</span>
+                                <span class="mini-stat warning">เฝ้าระวัง: ${rec.summary.warning}</span>
+                                <span class="mini-stat abnormal">ผิดปกติ: ${rec.summary.abnormal}</span>
+                            </div>
+                            <div class="compact-col-status">
+                                ${statusPillHTML}
+                            </div>
+                            <div class="compact-col-action">
+                                <button type="button" class="btn btn-outline btn-sm btn-view-detail" data-id="${rec.id}">ดูรายละเอียด (15 ข้อ)</button>
+                            </div>
                         </div>
-                        <div class="compact-col-info">
-                            <span>เวลา: ${rec.inspectionTime} น. | ช่าง: ${rec.inspectorName}</span>
-                            <span>ผู้อนุมัติ: <strong class="text-green">${rec.approverName || '-'}</strong></span>
-                        </div>
-                        <div class="compact-col-stats">
-                            <span class="mini-stat normal">ปกติ: ${rec.summary.normal}</span>
-                            <span class="mini-stat warning">เฝ้าระวัง: ${rec.summary.warning}</span>
-                            <span class="mini-stat abnormal">ผิดปกติ: ${rec.summary.abnormal}</span>
-                        </div>
-                        <div class="compact-col-status">
-                            <span class="compact-pill approved">อนุมัติแล้ว</span>
-                        </div>
-                        <div class="compact-col-action">
-                            <button type="button" class="btn btn-outline btn-sm btn-view-detail" data-id="${rec.id}">ดูรายละเอียด (15 ข้อ)</button>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 approvedHTML += `
                     <div class="history-date-card-wrapper">
                         <div class="history-date-card-header">
                             <span>📅 วันที่ ${DEIStorage.formatThaiDateOnly(dateISO)}</span>
-                            <span class="badge-count-machine">อนุมัติแล้ว ${listOnDate.length} เครื่อง</span>
+                            <span class="badge-count-machine">ดำเนินการแล้ว ${listOnDate.length} เครื่อง</span>
                         </div>
                         <div class="history-card-body-compact">
                             ${itemsRows}
@@ -126,9 +149,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <span class="mini-stat abnormal">ผิดปกติ: ${record.summary.abnormal}</span>
                 </div>
                 <div class="record-card-actions">
-                    <div class="action-buttons-right" style="margin-left:0;">
+                    <div class="action-buttons-right" style="margin-left:0;display:flex;gap:8px;flex-wrap:wrap;">
                         <button type="button" class="btn btn-outline btn-sm btn-view-detail" data-id="${record.id}">ดูรายละเอียด (15 ข้อ)</button>
                         <button type="button" class="btn btn-success btn-sm btn-open-approve" data-id="${record.id}">อนุมัติ</button>
+                        <button type="button" class="btn btn-danger btn-sm btn-open-reject" data-id="${record.id}" style="background:#dc2626;color:#fff;border-color:#dc2626;">ไม่อนุมัติ</button>
                     </div>
                 </div>
             </article>
@@ -140,7 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.querySelectorAll('.btn-view-detail').forEach(btn => {
             btn.addEventListener('click', () => {
-                const rec = allInspections.find(r => r.id === btn.dataset.id);
+                const rec = allInspections.find(r => String(r.id) === String(btn.dataset.id));
                 if (!rec) return;
                 detailModalBody.innerHTML = buildInspectionDetailHTML(rec);
                 inspectionDetailModal.classList.remove('hidden');
@@ -149,20 +173,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.querySelectorAll('.btn-open-approve').forEach(btn => {
             btn.addEventListener('click', () => {
-                const rec = allInspections.find(r => r.id === btn.dataset.id);
+                const rec = allInspections.find(r => String(r.id) === String(btn.dataset.id));
                 if (!rec) return;
                 currentTargetId = rec.id;
-                openModal(rec);
+                openModal(rec, 'approve');
+            });
+        });
+
+        document.querySelectorAll('.btn-open-reject').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const rec = allInspections.find(r => String(r.id) === String(btn.dataset.id));
+                if (!rec) return;
+                currentTargetId = rec.id;
+                openModal(rec, 'reject');
             });
         });
     }
 
-    function openModal(record) {
-        const settings = DEIStorage.getSettings();
-        const savedApprover = settings.lastSelectedApprover || '';
+    function openModal(record, mode = 'approve') {
+        currentModalMode = mode;
+        const savedApprover = getSavedApprover();
+        const isReject = mode === 'reject';
+
+        const modalTitleEl = approvalConfirmModal.querySelector('.modal-header h3');
+        if (modalTitleEl) {
+            modalTitleEl.textContent = isReject ? 'ไม่อนุมัติผลการตรวจสอบ' : 'การอนุมัติผลการตรวจสอบ';
+        }
+
+        confirmApprovalBtn.textContent = isReject ? 'ยืนยันไม่อนุมัติ' : 'ยืนยันอนุมัติ';
+        confirmApprovalBtn.className = isReject ? 'btn btn-danger' : 'btn btn-success';
+        confirmApprovalBtn.style.background = isReject ? '#dc2626' : '';
+        confirmApprovalBtn.style.color = isReject ? '#ffffff' : '';
 
         approvalModalBody.innerHTML = `
-            <div class="form-group" style="margin-bottom:16px;">
+            <div class="form-group" style="margin-bottom:14px;">
                 <label for="modalApproverSelect">เลือกชื่อผู้อนุมัติรายการตรวจสอบ <span class="required">*</span></label>
                 <select id="modalApproverSelect" class="form-control">
                     <option value="">-- กรุณาเลือกชื่อผู้อนุมัติ --</option>
@@ -171,6 +215,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <option value="นางสาวสุภาวดี ศรีสุข" ${savedApprover === 'นางสาวสุภาวดี ศรีสุข' ? 'selected' : ''}>นางสาวสุภาวดี ศรีสุข</option>
                 </select>
             </div>
+            ${isReject ? `
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label for="modalRejectReasonInput">เหตุผลที่ไม่อนุมัติ <span class="required">*</span></label>
+                    <textarea id="modalRejectReasonInput" class="form-control" rows="3" placeholder="ระบุเหตุผลที่ไม่อนุมัติ เช่น ค่าตรวจวัดไม่สอดคล้อง / ต้องตรวจสอบซ้ำ"></textarea>
+                </div>
+            ` : ''}
             <table class="confirm-summary-table">
                 <tr><td>รหัสเครื่องจักร</td><td class="text-blue">${record.machineCode}</td></tr>
                 <tr><td>ชื่อเครื่องจักร</td><td>${record.machineName}</td></tr>
@@ -178,6 +228,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             </table>
         `;
         approvalConfirmModal.classList.remove('hidden');
+
+        setTimeout(() => {
+            if (isReject) {
+                document.getElementById('modalRejectReasonInput')?.focus();
+            } else {
+                document.getElementById('modalApproverSelect')?.focus();
+            }
+        }, 50);
     }
 
     confirmApprovalBtn.addEventListener('click', async () => {
@@ -190,9 +248,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        DEIStorage.updateSettings({ lastSelectedApprover: approverName });
+        saveSelectedApprover(approverName);
 
-        // รอรับค่าจากการเรียก API อนุมัติแบบ async
+        if (currentModalMode === 'reject') {
+            const reasonEl = document.getElementById('modalRejectReasonInput');
+            const rejectReason = reasonEl ? reasonEl.value.trim() : '';
+
+            if (!rejectReason) {
+                showToast('กรุณากรอกเหตุผลที่ไม่อนุมัติก่อนยืนยัน', 'error');
+                if (reasonEl) reasonEl.focus();
+                return;
+            }
+
+            const res = await DEIStorage.rejectInspection(currentTargetId, approverName, rejectReason);
+            approvalConfirmModal.classList.add('hidden');
+
+            if (res && res.success) {
+                showToast('บันทึกรายการ "ไม่อนุมัติ" เรียบร้อยแล้ว', 'success');
+                await DEIStorage.renderSharedHeaderAndDashboard();
+                await renderLists();
+            } else {
+                showToast((res && res.message) ? res.message : 'เกิดข้อผิดพลาดในการบันทึกไม่อนุมัติ', 'error');
+            }
+            return;
+        }
+
         const res = await DEIStorage.approveInspection(currentTargetId, approverName);
         approvalConfirmModal.classList.add('hidden');
 

@@ -22,28 +22,78 @@ db.connect(err => {
     console.log('Connected to MySQL Database successfully!');
 });
 
-// สมัครสมาชิก
+async function sendVerificationEmail(toEmail, code, fullName) {
+    // รองรับส่งอีเมลจริงหากตั้งค่า SMTP_HOST, SMTP_USER, SMTP_PASS ใน Environment Variables
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: Number(process.env.SMTP_PORT || 587),
+                secure: process.env.SMTP_SECURE === 'true',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+            await transporter.sendMail({
+                from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                to: toEmail,
+                subject: 'รหัสยืนยันการรีเซ็ตรหัสผ่าน - ระบบตรวจเช็กเครื่องจักรประจำวัน',
+                text: `สวัสดีคุณ ${fullName || ''}\nรหัสยืนยันสำหรับรีเซ็ตรหัสผ่านของคุณคือ: ${code}\nรหัสนี้มีอายุ 15 นาที`
+            });
+            return { sentViaEmail: true };
+        } catch (e) {
+            console.error('Send email error:', e.message);
+        }
+    }
+    return { sentViaEmail: false };
+}
+
+// สมัครสมาชิก (ห้ามซ้ำทั้ง username และ email -> 1 อีเมลใช้ได้ 1 ยูสเซอร์)
 app.post('/api/auth/register', (req, res) => {
-    const { username, password, fullName, role } = req.body;
+    const { username, email, password, fullName, role } = req.body;
     const allowedRoles = ['inspector', 'approver', 'admin'];
     const safeRole = allowedRoles.includes(role) ? role : 'inspector';
 
-    if (!username || !password || !fullName) {
-        return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+    if (!username || !email || !password || !fullName) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน (ชื่อ-นามสกุล, ยูสเซอร์, อีเมล, รหัสผ่าน)' });
     }
 
-    db.query('SELECT id FROM users WHERE username = ?', [username.trim()], (err, rows) => {
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    db.query('SELECT id, username, email FROM users WHERE username = ? OR email = ?', [cleanUsername, cleanEmail], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
+
         if (rows.length > 0) {
-            return res.status(409).json({ success: false, message: 'ชื่อผู้ใช้งานนี้ถูกใช้ไปแล้ว' });
+            const dupUsername = rows.some(r => r.username === cleanUsername);
+            const dupEmail = rows.some(r => String(r.email || '').toLowerCase() === cleanEmail);
+            if (dupUsername) {
+                return res.status(409).json({ success: false, message: 'ชื่อผู้ใช้งาน (Username) นี้ถูกใช้ไปแล้ว กรุณาตั้งใหม่' });
+            }
+            if (dupEmail) {
+                return res.status(409).json({ success: false, message: 'อีเมลนี้ถูกใช้งานกับบัญชีอื่นแล้ว (1 อีเมลใช้ได้ 1 ยูสเซอร์)' });
+            }
         }
 
-        const sql = 'INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)';
-        db.query(sql, [username.trim(), password, fullName.trim(), safeRole], (insertErr, result) => {
-            if (insertErr) return res.status(500).json({ success: false, message: insertErr.message });
+        const sql = 'INSERT INTO users (username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?)';
+        db.query(sql, [cleanUsername, cleanEmail, password, fullName.trim(), safeRole], (insertErr, result) => {
+            if (insertErr) {
+                if (insertErr.code === 'ER_DUP_ENTRY') {
+                    return res.status(409).json({ success: false, message: 'ยูสเซอร์หรืออีเมลนี้มีอยู่ในระบบแล้ว' });
+                }
+                return res.status(500).json({ success: false, message: insertErr.message });
+            }
             res.json({
                 success: true,
-                user: { id: result.insertId, username: username.trim(), fullName: fullName.trim(), role: safeRole }
+                user: {
+                    id: result.insertId,
+                    username: cleanUsername,
+                    email: cleanEmail,
+                    fullName: fullName.trim(),
+                    role: safeRole
+                }
             });
         });
     });
@@ -56,7 +106,7 @@ app.post('/api/auth/login', (req, res) => {
         return res.status(400).json({ success: false, message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
     }
 
-    const sql = 'SELECT id, username, full_name, role FROM users WHERE username = ? AND password = ? LIMIT 1';
+    const sql = 'SELECT id, username, email, full_name, role FROM users WHERE username = ? AND password = ? LIMIT 1';
     db.query(sql, [username.trim(), password], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
         if (rows.length === 0) {
@@ -66,7 +116,79 @@ app.post('/api/auth/login', (req, res) => {
         const u = rows[0];
         res.json({
             success: true,
-            user: { id: u.id, username: u.username, fullName: u.full_name, role: u.role }
+            user: {
+                id: u.id,
+                username: u.username,
+                email: u.email,
+                fullName: u.full_name,
+                role: u.role
+            }
+        });
+    });
+});
+
+// ลืมรหัสผ่าน: ส่งรหัสยืนยัน 6 หลักไปยังอีเมล
+app.post('/api/auth/forgot-password', (req, res) => {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกอีเมลที่ใช้สมัครสมาชิก' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    db.query('SELECT id, username, email, full_name FROM users WHERE LOWER(email) = ? LIMIT 1', [cleanEmail], async (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบผู้ใช้งานที่ใช้อีเมลนี้ในระบบ' });
+        }
+
+        const user = rows[0];
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const updateSql = 'UPDATE users SET reset_code = ?, reset_expires = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id = ?';
+
+        db.query(updateSql, [code, user.id], async (upErr) => {
+            if (upErr) return res.status(500).json({ success: false, message: upErr.message });
+
+            const mailResult = await sendVerificationEmail(user.email, code, user.full_name);
+            res.json({
+                success: true,
+                message: mailResult.sentViaEmail
+                    ? `ส่งรหัสยืนยัน 6 หลักไปยังอีเมล ${user.email} เรียบร้อยแล้ว`
+                    : `สร้างรหัสยืนยันสำหรับอีเมล ${user.email} เรียบร้อยแล้ว`,
+                previewCode: mailResult.sentViaEmail ? undefined : code
+            });
+        });
+    });
+});
+
+// ยืนยันรหัสยืนยันจากอีเมลและตั้งรหัสผ่านใหม่
+app.post('/api/auth/reset-password', (req, res) => {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+        return res.status(400).json({ success: false, message: 'กรุณากรอกอีเมล รหัสยืนยัน และรหัสผ่านใหม่ให้ครบ' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim();
+
+    const sql = `
+        SELECT id, username FROM users
+        WHERE LOWER(email) = ? AND reset_code = ? AND (reset_expires IS NULL OR reset_expires >= NOW())
+        LIMIT 1
+    `;
+    db.query(sql, [cleanEmail, cleanCode], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length === 0) {
+            return res.status(400).json({ success: false, message: 'รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว' });
+        }
+
+        const user = rows[0];
+        db.query('UPDATE users SET password = ?, reset_code = NULL, reset_expires = NULL WHERE id = ?', [newPassword, user.id], (upErr) => {
+            if (upErr) return res.status(500).json({ success: false, message: upErr.message });
+            res.json({
+                success: true,
+                username: user.username,
+                password: newPassword
+            });
         });
     });
 });

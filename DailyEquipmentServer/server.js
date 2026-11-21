@@ -340,11 +340,19 @@ app.post('/api/auth/reset-password', (req, res) => {
     });
 });
 
-// เครื่องจักร
+// เครื่องจักร (ไม่ให้ซ้ำตาม code)
 app.get('/api/machines', (req, res) => {
     db.query('SELECT * FROM machines ORDER BY code ASC', (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(rows.map(r => ({ id: r.id, code: r.code, building: r.building, name: r.name })));
+        const seen = new Set();
+        const unique = [];
+        for (const r of rows) {
+            if (!seen.has(r.code)) {
+                seen.add(r.code);
+                unique.push({ id: r.id, code: r.code, building: r.building, name: r.name });
+            }
+        }
+        res.json(unique);
     });
 });
 
@@ -389,7 +397,7 @@ app.delete('/api/machines/:id', (req, res) => {
     });
 });
 
-// คำถามแยกตามเครื่องจักร (15 ข้อพื้นฐานเสมอถ้ายังไม่เพิ่ม/ลบ)
+// คำถามแยกตามเครื่องจักร
 app.get('/api/questions', (req, res) => {
     const machineCode = String(req.query.machineCode || '').trim();
 
@@ -437,7 +445,6 @@ app.get('/api/questions', (req, res) => {
     });
 });
 
-// เพิ่มคำถาม: รันเลขข้อถัดไปอัตโนมัติ (เช่น ข้อ 16) เฉพาะเครื่องที่เลือก
 app.post('/api/questions', (req, res) => {
     const { machineCode, title, hasMeasurement, unit, placeholder } = req.body;
     const cleanMachineCode = String(machineCode || '').trim();
@@ -475,7 +482,6 @@ app.post('/api/questions', (req, res) => {
     });
 });
 
-// แก้ไขคำถามเฉพาะข้อที่เลือก (ข้ออื่นไม่เปลี่ยน)
 app.put('/api/questions/:id', (req, res) => {
     const { title, hasMeasurement, unit, placeholder } = req.body;
     if (!title) {
@@ -495,7 +501,6 @@ app.put('/api/questions/:id', (req, res) => {
     });
 });
 
-// ลบคำถามและรันเลขข้อใหม่ (ลบข้อ 1 แล้วข้อ 2 ขยับเป็นข้อ 1)
 app.delete('/api/questions/:id', (req, res) => {
     db.query('SELECT machine_code FROM machine_questions WHERE id = ?', [req.params.id], (selErr, selRows) => {
         if (selErr) return res.status(500).json({ success: false, message: selErr.message });
@@ -545,11 +550,19 @@ app.post('/api/inspections', (req, res) => {
     const data = req.body;
     const itemsJson = JSON.stringify(data.items);
 
-    const checkQuery = 'SELECT id FROM inspections WHERE machine_code = ? AND inspection_date = ?';
+    const checkQuery = 'SELECT id, approval_status FROM inspections WHERE machine_code = ? AND inspection_date = ?';
     db.query(checkQuery, [data.machineCode, data.inspectionDate], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
 
         if (results.length > 0) {
+            const existingRow = results[0];
+            if (existingRow.approval_status !== 'ไม่อนุมัติ') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'รายการนี้ถูกส่ง/อนุมัติแล้ว ไม่สามารถแก้ไขได้จนกว่าผู้อนุมัติจะกดไม่อนุมัติ'
+                });
+            }
+
             const updateQuery = `
                 UPDATE inspections
                 SET inspection_time = ?, inspector_name = ?, items_json = ?,
@@ -586,34 +599,52 @@ app.post('/api/inspections', (req, res) => {
 app.put('/api/inspections/:id/approve', (req, res) => {
     const { id } = req.params;
     const { approverName, approvedDate, approvedTime } = req.body;
-    const query = `
-        UPDATE inspections
-        SET approval_status = 'อนุมัติแล้ว', approver_name = ?, approved_date = ?, approved_time = ?, reject_reason = NULL
-        WHERE id = ?
-    `;
-    db.query(query, [approverName, approvedDate, approvedTime, id], (err, result) => {
-        if (err) return res.status(500).json({ success: false, error: err.message });
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'ไม่พบรายการตรวจเช็กนี้' });
-        }
-        res.json({ success: true });
+
+    db.query('SELECT machine_code, inspection_date FROM inspections WHERE id = ? LIMIT 1', [id], (selErr, rows) => {
+        if (selErr) return res.status(500).json({ success: false, error: selErr.message });
+
+        const target = rows[0];
+        const query = target
+            ? `UPDATE inspections SET approval_status = 'อนุมัติแล้ว', approver_name = ?, approved_date = ?, approved_time = ?, reject_reason = NULL WHERE machine_code = ? AND inspection_date = ?`
+            : `UPDATE inspections SET approval_status = 'อนุมัติแล้ว', approver_name = ?, approved_date = ?, approved_time = ?, reject_reason = NULL WHERE id = ?`;
+
+        const params = target
+            ? [approverName, approvedDate, approvedTime, target.machine_code, target.inspection_date]
+            : [approverName, approvedDate, approvedTime, id];
+
+        db.query(query, params, (err, result) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'ไม่พบรายการตรวจเช็กนี้' });
+            }
+            res.json({ success: true });
+        });
     });
 });
 
 app.put('/api/inspections/:id/reject', (req, res) => {
     const { id } = req.params;
     const { approverName, rejectReason } = req.body;
-    const query = `
-        UPDATE inspections
-        SET approval_status = 'ไม่อนุมัติ', approver_name = ?, reject_reason = ?
-        WHERE id = ?
-    `;
-    db.query(query, [approverName || 'ผู้อนุมัติ', rejectReason || 'ไม่ผ่านการอนุมัติ', id], (err, result) => {
-        if (err) return res.status(500).json({ success: false, error: err.message });
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'ไม่พบรายการตรวจเช็กนี้' });
-        }
-        res.json({ success: true });
+
+    db.query('SELECT machine_code, inspection_date FROM inspections WHERE id = ? LIMIT 1', [id], (selErr, rows) => {
+        if (selErr) return res.status(500).json({ success: false, error: selErr.message });
+
+        const target = rows[0];
+        const query = target
+            ? `UPDATE inspections SET approval_status = 'ไม่อนุมัติ', approver_name = ?, reject_reason = ? WHERE machine_code = ? AND inspection_date = ?`
+            : `UPDATE inspections SET approval_status = 'ไม่อนุมัติ', approver_name = ?, reject_reason = ? WHERE id = ?`;
+
+        const params = target
+            ? [approverName || 'ผู้อนุมัติ', rejectReason || 'ไม่ผ่านการอนุมัติ', target.machine_code, target.inspection_date]
+            : [approverName || 'ผู้อนุมัติ', rejectReason || 'ไม่ผ่านการอนุมัติ', id];
+
+        db.query(query, params, (err, result) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'ไม่พบรายการตรวจเช็กนี้' });
+            }
+            res.json({ success: true });
+        });
     });
 });
 

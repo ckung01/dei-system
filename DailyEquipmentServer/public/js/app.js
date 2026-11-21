@@ -33,6 +33,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         return String(b || '').trim().toUpperCase().replace(/^อาคาร\s*/i, '');
     }
 
+    // แยกส่วนรหัส เช่น "A-M000" -> prefix: "A-M", num: 0 | "A-M013" -> prefix: "A-M", num: 13
+    function parseMachineCodeParts(code) {
+        const clean = normalizeCode(code);
+        const match = clean.match(/^(.*?)(\d+)$/);
+        if (match) {
+            return {
+                prefix: match[1],
+                num: parseInt(match[2], 10),
+                raw: clean
+            };
+        }
+        return {
+            prefix: clean,
+            num: Number.MAX_SAFE_INTEGER,
+            raw: clean
+        };
+    }
+
+    function compareMachinesByNumber(a, b) {
+        const partA = parseMachineCodeParts(a.code);
+        const partB = parseMachineCodeParts(b.code);
+
+        if (partA.prefix !== partB.prefix) {
+            return partA.prefix.localeCompare(partB.prefix, 'en', { numeric: true });
+        }
+        if (partA.num !== partB.num) {
+            return partA.num - partB.num;
+        }
+        return partA.raw.localeCompare(partB.raw, 'en', { numeric: true });
+    }
+
     function getCleanMachinesByBuilding(buildingValue) {
         const targetB = normalizeBuilding(buildingValue);
         const allMachines = typeof DEIStorage.getMachines === 'function'
@@ -61,7 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        return result;
+        return result.sort(compareMachinesByNumber);
     }
 
     function getFlatQuestions() {

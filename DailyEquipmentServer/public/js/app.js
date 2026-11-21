@@ -15,6 +15,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resetFormBtn = document.getElementById('resetFormBtn');
     const submitFormBtn = inspectionFormContainer.querySelector('button[type="submit"]');
 
+    // แถบแสดงรายการเครื่องจักรแบบสีจริง (สีเขียว = ตรวจแล้ว, สีดำ = ยังไม่ตรวจ/ไม่อนุมัติ, ต่อท้าย [รออนุมัติ])
+    let machineColorListBox = document.getElementById('machineColorStatusBox');
+    if (!machineColorListBox && machineSelect && machineSelect.parentElement) {
+        machineColorListBox = document.createElement('div');
+        machineColorListBox.id = 'machineColorStatusBox';
+        machineColorListBox.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;';
+        machineSelect.parentElement.appendChild(machineColorListBox);
+    }
+
     if (isReadOnlyApprover) {
         inspectorNameInput.disabled = true;
         inspectorNameInput.placeholder = 'โหมดดูข้อมูลสำหรับผู้อนุมัติ (ไม่สามารถกรอกหรือบันทึกได้)';
@@ -34,17 +43,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         10: { min: 35.0, max: 55.0, name: 'กระแสไฟฟ้า' }
     };
 
-    function getActiveCategories() {
-        return DEIStorage.getChecklistCategories();
+    function getFlatQuestions() {
+        const cats = DEIStorage.getChecklistCategories();
+        return cats.flatMap((cat, cIdx) =>
+            cat.items.map((item, idx) => ({
+                ...item,
+                seq: idx + 1,
+                categoryCode: cat.catCode || '01',
+                categoryName: cat.catName || 'รายการตรวจสอบเครื่องจักรทั้งหมด'
+            }))
+        );
     }
 
-    function getTotalQuestionsCount() {
-        return getActiveCategories().reduce((sum, cat) => sum + cat.items.length, 0);
+    function getMachineDisplayInfo(m, todayInspections) {
+        const rec = todayInspections.find(i => i.machineCode === m.code);
+        if (!rec) {
+            return { label: `${m.code} - ${m.name}`, color: '#0f172a', bg: '#f8fafc', border: '#cbd5e1' };
+        }
+        if (rec.approvalStatus === 'รออนุมัติ') {
+            return { label: `${m.code} - ${m.name} [รออนุมัติ]`, color: '#16a34a', bg: '#f0fdf4', border: '#86efac' };
+        }
+        if (rec.approvalStatus === 'ไม่อนุมัติ') {
+            return { label: `${m.code} - ${m.name}`, color: '#0f172a', bg: '#f8fafc', border: '#cbd5e1' };
+        }
+        return { label: `${m.code} - ${m.name}`, color: '#16a34a', bg: '#f0fdf4', border: '#86efac' };
     }
 
     buildingSelect.addEventListener('change', async () => {
         const b = buildingSelect.value;
         machineSelect.innerHTML = '';
+        if (machineColorListBox) machineColorListBox.innerHTML = '';
+
         if (!b) {
             machineSelect.disabled = true;
             machineSelect.innerHTML = '<option value="">-- กรุณาเลือกอาคารก่อน --</option>';
@@ -66,11 +95,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         machines.forEach(m => {
-            const isChecked = todayInspections.some(i => i.machineCode === m.code);
+            const info = getMachineDisplayInfo(m, todayInspections);
             const opt = document.createElement('option');
             opt.value = m.code;
-            opt.textContent = `${m.code} - ${m.name}${isChecked ? ' [ตรวจแล้ววันนี้]' : ' [ยังไม่ตรวจวันนี้]'}`;
+            opt.textContent = info.label;
+            opt.style.color = info.color;
             machineSelect.appendChild(opt);
+
+            if (machineColorListBox) {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.textContent = info.label;
+                chip.style.cssText = `
+                    padding: 6px 10px;
+                    border-radius: 8px;
+                    border: 1px solid ${info.border};
+                    background: ${info.bg};
+                    color: ${info.color};
+                    font-family: 'Prompt', sans-serif;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                `;
+                chip.addEventListener('click', async () => {
+                    machineSelect.value = m.code;
+                    currentMachine = m;
+                    await openForm(m);
+                });
+                machineColorListBox.appendChild(chip);
+            }
         });
     });
 
@@ -89,8 +142,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function openForm(machine) {
         await DEIStorage.loadQuestions(machine.code);
-        const categories = getActiveCategories();
-        const totalQuestions = getTotalQuestionsCount();
+        const itemsList = getFlatQuestions();
+        const totalQuestions = itemsList.length;
         const todayISO = DEIStorage.getTodayISO();
 
         const headerTitleEl = document.querySelector('.checklist-header-bar h3');
@@ -110,6 +163,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         checklistState = {};
+        itemsList.forEach(i => {
+            checklistState[i.id] = { status: '', measurementValue: '', remark: '' };
+        });
 
         document.getElementById('detailBuilding').textContent = `อาคาร ${machine.building}`;
         document.getElementById('detailMachineCode').textContent = machine.code;
@@ -119,26 +175,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         const banner = document.getElementById('duplicateWarningBanner');
         const badge = document.getElementById('machineTodayStatusBadge');
 
-        categories.forEach(cat => {
-            cat.items.forEach(i => {
-                checklistState[i.id] = { status: '', measurementValue: '', remark: '' };
-            });
-        });
-
         if (existing) {
             banner.classList.remove('hidden');
-            badge.textContent = 'ตรวจแล้ววันนี้';
+            badge.textContent = existing.approvalStatus === 'รออนุมัติ'
+                ? 'รออนุมัติ'
+                : existing.approvalStatus === 'ไม่อนุมัติ'
+                    ? 'ไม่อนุมัติ'
+                    : 'ตรวจแล้ววันนี้';
             badge.classList.add('checked');
             inspectorNameInput.value = existing.inspectorName || '';
 
             if (Array.isArray(existing.items)) {
-                existing.items.forEach((i, idx) => {
-                    const matchedItem = categories.flatMap(c => c.items).find(item => item.seq === i.seq) || categories.flatMap(c => c.items)[idx];
-                    if (matchedItem) {
-                        checklistState[matchedItem.id] = {
-                            status: i.status || '',
-                            measurementValue: i.measurementValue || '',
-                            remark: i.remark || ''
+                existing.items.forEach((oldItem, idx) => {
+                    const target = itemsList.find(q => q.seq === oldItem.seq) || itemsList[idx];
+                    if (target) {
+                        checklistState[target.id] = {
+                            status: oldItem.status || '',
+                            measurementValue: oldItem.measurementValue || '',
+                            remark: oldItem.remark || ''
                         };
                     }
                 });
@@ -157,65 +211,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         inspectionFormContainer.classList.remove('hidden');
     }
 
+    // เรียงคำถามยาวลงมาเลย 15 ข้อ ไม่แยกหมวดหมู่
     function renderChecklist() {
-        const categories = getActiveCategories();
+        const itemsList = getFlatQuestions();
         checklistCategoriesContainer.innerHTML = '';
 
-        categories.forEach(cat => {
-            const card = document.createElement('div');
-            card.className = `category-card ${cat.catClass}`;
+        const card = document.createElement('div');
+        card.className = 'category-card cat-01';
+        card.innerHTML = `
+            <div class="category-header">
+                <div class="category-title-wrap">
+                    <span class="category-name">รายการตรวจสอบเครื่องจักรประจำวัน</span>
+                </div>
+                <span class="category-count-badge">${itemsList.length} รายการ</span>
+            </div>
+        `;
 
-            card.innerHTML = `
-                <div class="category-header">
-                    <div class="category-title-wrap">
-                        <span class="category-num-badge">${cat.catCode}</span>
-                        <span class="category-name">${cat.catName}</span>
+        itemsList.forEach((item, index) => {
+            const displaySeq = index + 1;
+            const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
+            const needRemark = st.status === 'warning' || st.status === 'abnormal';
+
+            let placeholderText = item.placeholder || '8-12';
+            if (MEASUREMENT_RANGES[displaySeq]) {
+                const r = MEASUREMENT_RANGES[displaySeq];
+                placeholderText = `ปกติ ${r.min}-${r.max} ${item.unit}`;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'checklist-item-row';
+            row.innerHTML = `
+                <div class="item-main-line">
+                    <div class="item-left-info">
+                        <span class="item-seq">${displaySeq}</span>
+                        <span class="item-title">${item.title}</span>
                     </div>
-                    <span class="category-count-badge">${cat.items.length} รายการ</span>
+                    <div class="item-right-controls">
+                        ${item.hasMeasurement ? `
+                            <div class="measurement-box" title="ตัวอย่างค่า: ${placeholderText}">
+                                <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" placeholder="${placeholderText}" value="${st.measurementValue}" ${isReadOnlyApprover ? 'disabled' : ''}>
+                                <span class="measurement-unit">${item.unit}</span>
+                            </div>
+                        ` : ''}
+                        <div class="status-btn-group">
+                            <button type="button" class="status-btn ${st.status === 'normal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="normal" ${isReadOnlyApprover ? 'disabled' : ''}>ปกติ</button>
+                            <button type="button" class="status-btn ${st.status === 'warning' ? 'selected' : ''}" data-item-id="${item.id}" data-status="warning" ${isReadOnlyApprover ? 'disabled' : ''}>เฝ้าระวัง</button>
+                            <button type="button" class="status-btn ${st.status === 'abnormal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="abnormal" ${isReadOnlyApprover ? 'disabled' : ''}>ผิดปกติ</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="item-remark-box ${needRemark ? '' : 'hidden'}" id="remarkBox_${item.id}">
+                    <input type="text" class="remark-input ${st.status === 'abnormal' ? 'is-abnormal' : ''}" id="remarkInput_${item.id}" data-item-id="${item.id}" placeholder="ระบุหมายเหตุ / อาการ *" value="${st.remark}" ${isReadOnlyApprover ? 'disabled' : ''}>
                 </div>
             `;
-
-            cat.items.forEach((item, index) => {
-                const displaySeq = item.seq || (index + 1);
-                const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
-                const needRemark = st.status === 'warning' || st.status === 'abnormal';
-
-                let placeholderText = item.placeholder || 'กรอกค่าตรวจวัด';
-                if (MEASUREMENT_RANGES[displaySeq]) {
-                    const r = MEASUREMENT_RANGES[displaySeq];
-                    placeholderText = `ปกติ ${r.min}-${r.max} ${item.unit}`;
-                }
-
-                const row = document.createElement('div');
-                row.className = 'checklist-item-row';
-                row.innerHTML = `
-                    <div class="item-main-line">
-                        <div class="item-left-info">
-                            <span class="item-seq">${displaySeq}</span>
-                            <span class="item-title">${item.title}</span>
-                        </div>
-                        <div class="item-right-controls">
-                            ${item.hasMeasurement ? `
-                                <div class="measurement-box" title="ช่วงปกติ: ${placeholderText}">
-                                    <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" placeholder="${placeholderText}" value="${st.measurementValue}" ${isReadOnlyApprover ? 'disabled' : ''}>
-                                    <span class="measurement-unit">${item.unit}</span>
-                                </div>
-                            ` : ''}
-                            <div class="status-btn-group">
-                                <button type="button" class="status-btn ${st.status === 'normal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="normal" ${isReadOnlyApprover ? 'disabled' : ''}>ปกติ</button>
-                                <button type="button" class="status-btn ${st.status === 'warning' ? 'selected' : ''}" data-item-id="${item.id}" data-status="warning" ${isReadOnlyApprover ? 'disabled' : ''}>เฝ้าระวัง</button>
-                                <button type="button" class="status-btn ${st.status === 'abnormal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="abnormal" ${isReadOnlyApprover ? 'disabled' : ''}>ผิดปกติ</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="item-remark-box ${needRemark ? '' : 'hidden'}" id="remarkBox_${item.id}">
-                        <input type="text" class="remark-input ${st.status === 'abnormal' ? 'is-abnormal' : ''}" id="remarkInput_${item.id}" data-item-id="${item.id}" placeholder="ระบุหมายเหตุ / อาการ *" value="${st.remark}" ${isReadOnlyApprover ? 'disabled' : ''}>
-                    </div>
-                `;
-                card.appendChild(row);
-            });
-            checklistCategoriesContainer.appendChild(card);
+            card.appendChild(row);
         });
+
+        checklistCategoriesContainer.appendChild(card);
 
         if (!isReadOnlyApprover) {
             bindEvents();
@@ -307,7 +359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateProgress() {
         let c = 0;
         Object.values(checklistState).forEach(s => { if (s && s.status) c++; });
-        const total = getTotalQuestionsCount();
+        const total = getFlatQuestions().length;
         const progressPill = document.querySelector('.checklist-progress-pill');
         if (progressPill) {
             progressPill.innerHTML = `เลือกสถานะแล้ว: <strong id="checkedCountText">${c}</strong> / ${total} ข้อ`;
@@ -332,28 +384,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         const inspector = inspectorNameInput.value.trim();
         if (!inspector) { showToast('กรุณากรอกชื่อช่างผู้ตรวจสอบ', 'error'); inspectorNameInput.focus(); return; }
 
-        const categories = getActiveCategories();
+        const itemsList = getFlatQuestions();
         const items = [];
         let normalCount = 0, warningCount = 0, abnormalCount = 0;
 
-        for (const cat of categories) {
-            for (const item of cat.items) {
-                const st = checklistState[item.id];
-                if (!st || !st.status) { showToast(`กรุณาเลือกสถานะข้อ ${item.seq}`, 'error'); return; }
-                if (item.hasMeasurement && !String(st.measurementValue || '').trim()) { showToast(`กรุณากรอกค่าตรวจวัดข้อ ${item.seq}`, 'error'); return; }
-                if ((st.status === 'warning' || st.status === 'abnormal') && !String(st.remark || '').trim()) { showToast(`กรุณากรอกหมายเหตุข้อ ${item.seq}`, 'error'); return; }
+        for (let idx = 0; idx < itemsList.length; idx++) {
+            const item = itemsList[idx];
+            const seqNum = idx + 1;
+            const st = checklistState[item.id];
+            if (!st || !st.status) { showToast(`กรุณาเลือกสถานะข้อ ${seqNum}`, 'error'); return; }
+            if (item.hasMeasurement && !String(st.measurementValue || '').trim()) { showToast(`กรุณากรอกค่าตรวจวัดข้อ ${seqNum}`, 'error'); return; }
+            if ((st.status === 'warning' || st.status === 'abnormal') && !String(st.remark || '').trim()) { showToast(`กรุณากรอกหมายเหตุข้อ ${seqNum}`, 'error'); return; }
 
-                if (st.status === 'normal') normalCount++;
-                else if (st.status === 'warning') warningCount++;
-                else if (st.status === 'abnormal') abnormalCount++;
+            if (st.status === 'normal') normalCount++;
+            else if (st.status === 'warning') warningCount++;
+            else if (st.status === 'abnormal') abnormalCount++;
 
-                items.push({
-                    id: item.id, categoryCode: cat.catCode, categoryName: cat.catName,
-                    seq: item.seq, title: item.title, hasMeasurement: item.hasMeasurement,
-                    unit: item.unit, measurementValue: st.measurementValue,
-                    status: st.status, remark: st.remark
-                });
-            }
+            items.push({
+                id: item.id,
+                categoryCode: item.categoryCode,
+                categoryName: item.categoryName,
+                seq: seqNum,
+                title: item.title,
+                hasMeasurement: item.hasMeasurement,
+                unit: item.unit,
+                measurementValue: st.measurementValue,
+                status: st.status,
+                remark: st.remark
+            });
         }
 
         const todayISO = DEIStorage.getTodayISO();

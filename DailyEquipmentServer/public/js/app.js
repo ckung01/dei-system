@@ -1,9 +1,7 @@
-/**
- * Daily Equipment Inspection System - หน้าที่สำคัญ: ตรวจเช็กประจำวัน (index.html)
- * พร้อมระบบตรวจสอบเกณฑ์ตัวเลขมาตรฐานอัตโนมัติ และดึงคำถาม/เครื่องจักรจากฐานข้อมูลแบบไดนามิก
- */
-
 document.addEventListener('DOMContentLoaded', async () => {
+    const currentUser = DEIAuth.getUser();
+    const isReadOnlyApprover = currentUser && currentUser.role === 'approver';
+
     await DEIStorage.init();
     await DEIStorage.renderSharedHeaderAndDashboard();
 
@@ -15,6 +13,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const checklistCategoriesContainer = document.getElementById('checklistCategoriesContainer');
     const inspectorNameInput = document.getElementById('inspectorNameInput');
     const resetFormBtn = document.getElementById('resetFormBtn');
+    const submitFormBtn = inspectionFormContainer.querySelector('button[type="submit"]');
+
+    if (isReadOnlyApprover) {
+        inspectorNameInput.disabled = true;
+        inspectorNameInput.placeholder = 'โหมดดูข้อมูลสำหรับผู้อนุมัติ (ไม่สามารถกรอกหรือบันทึกได้)';
+        if (resetFormBtn) resetFormBtn.style.display = 'none';
+        if (submitFormBtn) submitFormBtn.style.display = 'none';
+    }
 
     let currentMachine = null;
     let checklistState = {};
@@ -54,11 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let todayInspections = [];
         try {
             const allInspections = await DEIStorage.getInspections();
-            todayInspections = allInspections.filter(i => {
-                if (!i.inspectionDate) return false;
-                const dbDate = String(i.inspectionDate).split('T')[0];
-                return dbDate === todayISO;
-            });
+            todayInspections = allInspections.filter(i => String(i.inspectionDate || '').split('T')[0] === todayISO);
         } catch (e) {
             console.error('Error checking inspection status:', e);
         }
@@ -67,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isChecked = todayInspections.some(i => i.machineCode === m.code);
             const opt = document.createElement('option');
             opt.value = m.code;
-            opt.textContent = `${m.code} - ${m.name}${isChecked ? ' [ตรวจแล้ววันนี้]' : ''}`;
+            opt.textContent = `${m.code} - ${m.name}${isChecked ? ' [ตรวจแล้ววันนี้]' : ' [ยังไม่ตรวจวันนี้]'}`;
             machineSelect.appendChild(opt);
         });
     });
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     async function openForm(machine) {
-        await DEIStorage.loadQuestions();
+        await DEIStorage.loadQuestions(machine.code);
         const categories = getActiveCategories();
         const totalQuestions = getTotalQuestionsCount();
         const todayISO = DEIStorage.getTodayISO();
@@ -130,9 +132,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             inspectorNameInput.value = existing.inspectorName || '';
 
             if (Array.isArray(existing.items)) {
-                existing.items.forEach(i => {
-                    if (checklistState[i.id]) {
-                        checklistState[i.id] = {
+                existing.items.forEach((i, idx) => {
+                    const matchedItem = categories.flatMap(c => c.items).find(item => item.seq === i.seq) || categories.flatMap(c => c.items)[idx];
+                    if (matchedItem) {
+                        checklistState[matchedItem.id] = {
                             status: i.status || '',
                             measurementValue: i.measurementValue || '',
                             remark: i.remark || ''
@@ -140,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             }
-            showToast('โหลดข้อมูลเดิมของวันนี้แล้ว', 'info');
+            showToast('โหลดข้อมูลของวันนี้แล้ว', 'info');
         } else {
             banner.classList.add('hidden');
             badge.textContent = 'ยังไม่ตรวจวันนี้';
@@ -172,13 +175,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
 
-            cat.items.forEach(item => {
+            cat.items.forEach((item, index) => {
+                const displaySeq = item.seq || (index + 1);
                 const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
                 const needRemark = st.status === 'warning' || st.status === 'abnormal';
 
                 let placeholderText = item.placeholder || 'กรอกค่าตรวจวัด';
-                if (MEASUREMENT_RANGES[item.id]) {
-                    const r = MEASUREMENT_RANGES[item.id];
+                if (MEASUREMENT_RANGES[displaySeq]) {
+                    const r = MEASUREMENT_RANGES[displaySeq];
                     placeholderText = `ปกติ ${r.min}-${r.max} ${item.unit}`;
                 }
 
@@ -187,25 +191,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 row.innerHTML = `
                     <div class="item-main-line">
                         <div class="item-left-info">
-                            <span class="item-seq">${item.seq}</span>
+                            <span class="item-seq">${displaySeq}</span>
                             <span class="item-title">${item.title}</span>
                         </div>
                         <div class="item-right-controls">
                             ${item.hasMeasurement ? `
                                 <div class="measurement-box" title="ช่วงปกติ: ${placeholderText}">
-                                    <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" placeholder="${placeholderText}" value="${st.measurementValue}">
+                                    <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" placeholder="${placeholderText}" value="${st.measurementValue}" ${isReadOnlyApprover ? 'disabled' : ''}>
                                     <span class="measurement-unit">${item.unit}</span>
                                 </div>
                             ` : ''}
                             <div class="status-btn-group">
-                                <button type="button" class="status-btn ${st.status === 'normal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="normal">ปกติ</button>
-                                <button type="button" class="status-btn ${st.status === 'warning' ? 'selected' : ''}" data-item-id="${item.id}" data-status="warning">เฝ้าระวัง</button>
-                                <button type="button" class="status-btn ${st.status === 'abnormal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="abnormal">ผิดปกติ</button>
+                                <button type="button" class="status-btn ${st.status === 'normal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="normal" ${isReadOnlyApprover ? 'disabled' : ''}>ปกติ</button>
+                                <button type="button" class="status-btn ${st.status === 'warning' ? 'selected' : ''}" data-item-id="${item.id}" data-status="warning" ${isReadOnlyApprover ? 'disabled' : ''}>เฝ้าระวัง</button>
+                                <button type="button" class="status-btn ${st.status === 'abnormal' ? 'selected' : ''}" data-item-id="${item.id}" data-status="abnormal" ${isReadOnlyApprover ? 'disabled' : ''}>ผิดปกติ</button>
                             </div>
                         </div>
                     </div>
                     <div class="item-remark-box ${needRemark ? '' : 'hidden'}" id="remarkBox_${item.id}">
-                        <input type="text" class="remark-input ${st.status === 'abnormal' ? 'is-abnormal' : ''}" id="remarkInput_${item.id}" data-item-id="${item.id}" placeholder="ระบุหมายเหตุ / อาการ *" value="${st.remark}">
+                        <input type="text" class="remark-input ${st.status === 'abnormal' ? 'is-abnormal' : ''}" id="remarkInput_${item.id}" data-item-id="${item.id}" placeholder="ระบุหมายเหตุ / อาการ *" value="${st.remark}" ${isReadOnlyApprover ? 'disabled' : ''}>
                     </div>
                 `;
                 card.appendChild(row);
@@ -213,7 +217,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             checklistCategoriesContainer.appendChild(card);
         });
 
-        bindEvents();
+        if (!isReadOnlyApprover) {
+            bindEvents();
+        }
     }
 
     function bindEvents() {
@@ -245,13 +251,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         checklistCategoriesContainer.querySelectorAll('.measurement-input').forEach(input => {
             input.addEventListener('input', () => {
                 const id = Number(input.dataset.itemId);
+                const seq = Number(input.dataset.seq);
                 const val = input.value;
                 if (!checklistState[id]) checklistState[id] = {};
                 checklistState[id].measurementValue = val;
 
-                if (val !== '' && MEASUREMENT_RANGES[id]) {
+                if (val !== '' && MEASUREMENT_RANGES[seq]) {
                     const num = parseFloat(val);
-                    const range = MEASUREMENT_RANGES[id];
+                    const range = MEASUREMENT_RANGES[seq];
 
                     if (!isNaN(num)) {
                         const row = input.closest('.checklist-item-row');
@@ -271,7 +278,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 checklistState[id].remark = `ค่าเกินเกณฑ์มาตรฐาน (${range.min}-${range.max})`;
                                 remarkInput.value = checklistState[id].remark;
                             }
-                            showToast(`ค่า ${range.name} (${num}) อยู่นอกช่วงปกติ ระบบปรับเป็น "ผิดปกติ" อัตโนมัติ`, 'warning');
                         } else {
                             if (checklistState[id].status === '' || checklistState[id].status === 'abnormal') {
                                 checklistState[id].status = 'normal';
@@ -308,19 +314,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    resetFormBtn.addEventListener('click', () => {
-        if (!currentMachine) return;
-        Object.keys(checklistState).forEach(id => {
-            checklistState[id] = { status: '', measurementValue: '', remark: '' };
+    if (resetFormBtn) {
+        resetFormBtn.addEventListener('click', () => {
+            if (!currentMachine || isReadOnlyApprover) return;
+            Object.keys(checklistState).forEach(id => {
+                checklistState[id] = { status: '', measurementValue: '', remark: '' };
+            });
+            renderChecklist();
+            updateProgress();
+            showToast('ล้างค่าเรียบร้อย', 'info');
         });
-        renderChecklist();
-        updateProgress();
-        showToast('ล้างค่าเรียบร้อย', 'info');
-    });
+    }
 
     inspectionFormContainer.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!currentMachine) return;
+        if (!currentMachine || isReadOnlyApprover) return;
         const inspector = inspectorNameInput.value.trim();
         if (!inspector) { showToast('กรุณากรอกชื่อช่างผู้ตรวจสอบ', 'error'); inspectorNameInput.focus(); return; }
 
@@ -331,9 +339,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         for (const cat of categories) {
             for (const item of cat.items) {
                 const st = checklistState[item.id];
-                if (!st || !st.status) { showToast(`กรุณาเลือกสถานะข้อ ${cat.catCode}-${item.seq}`, 'error'); return; }
-                if (item.hasMeasurement && !st.measurementValue.trim()) { showToast(`กรุณากรอกค่าตรวจวัดข้อ ${cat.catCode}-${item.seq}`, 'error'); return; }
-                if ((st.status === 'warning' || st.status === 'abnormal') && !st.remark.trim()) { showToast(`กรุณากรอกหมายเหตุข้อ ${cat.catCode}-${item.seq}`, 'error'); return; }
+                if (!st || !st.status) { showToast(`กรุณาเลือกสถานะข้อ ${item.seq}`, 'error'); return; }
+                if (item.hasMeasurement && !String(st.measurementValue || '').trim()) { showToast(`กรุณากรอกค่าตรวจวัดข้อ ${item.seq}`, 'error'); return; }
+                if ((st.status === 'warning' || st.status === 'abnormal') && !String(st.remark || '').trim()) { showToast(`กรุณากรอกหมายเหตุข้อ ${item.seq}`, 'error'); return; }
 
                 if (st.status === 'normal') normalCount++;
                 else if (st.status === 'warning') warningCount++;

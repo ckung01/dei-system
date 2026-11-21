@@ -104,7 +104,7 @@ const DEIAuth = {
             return ['index.html', 'history.html'].includes(pageName);
         }
         if (role === 'approver') {
-            return ['approval.html', 'history.html'].includes(pageName);
+            return ['index.html', 'approval.html', 'history.html'].includes(pageName);
         }
         return false;
     },
@@ -185,11 +185,10 @@ const DEIAuth = {
             if (user.role === 'inspector') {
                 item.style.display = (href === 'index.html' || href === 'history.html') ? '' : 'none';
             } else if (user.role === 'approver') {
-                item.style.display = (href === 'approval.html' || href === 'history.html') ? '' : 'none';
+                item.style.display = (href === 'index.html' || href === 'approval.html' || href === 'history.html') ? '' : 'none';
             } else if (user.role === 'admin') {
                 item.style.display = '';
             }
         });
     }
 };
-

@@ -1,95 +1,135 @@
 /**
- * Daily Equipment Inspection System - Data Management (Server API Version)
+ * Daily Equipment Inspection System - Data Management (Database API Version)
  */
 
-const DEI_STORAGE_KEYS = {
-    MACHINES: 'dei_machines',
-    INSPECTIONS: 'dei_inspections',
-    SETTINGS: 'dei_settings'
-};
+let CACHED_MACHINES = [];
+let CACHED_QUESTIONS = [];
 
-const DEFAULT_MACHINES = [
-    { code: 'A-M001', building: 'A', name: 'เครื่องปั๊มลมสกรูหลักชุดที่ 1 (Main Screw Air Compressor #1)' },
-    { code: 'A-M002', building: 'A', name: 'เครื่องปั๊มลมสกรูหลักชุดที่ 2 (Main Screw Air Compressor #2)' },
-    { code: 'A-M003', building: 'A', name: 'เครื่องทำน้ำเย็นชิลเลอร์สายการผลิต A1 (Industrial Water Chiller A1)' },
-    { code: 'A-M004', building: 'A', name: 'เครื่องทำน้ำเย็นชิลเลอร์สายการผลิต A2 (Industrial Water Chiller A2)' },
-    { code: 'A-M005', building: 'A', name: 'ปั๊มส่งน้ำหล่อเย็นแรงดันสูง A1 (Cooling Water Booster Pump A1)' },
-    { code: 'A-M006', building: 'A', name: 'ปั๊มส่งน้ำหล่อเย็นแรงดันสูง A2 (Cooling Water Booster Pump A2)' },
-    { code: 'A-M007', building: 'A', name: 'เครื่องทำลมแห้งแบบใช้น้ำยา A1 (Refrigerated Air Dryer A1)' },
-    { code: 'A-M008', building: 'A', name: 'หอผึ่งน้ำหล่อเย็นอาคาร A (Cooling Tower Unit A)' },
-    { code: 'A-M009', building: 'A', name: 'เครื่องอัดไฮดรอลิกขึ้นรูปโลหะ A1 (Hydraulic Forming Press A1)' },
-    { code: 'A-M010', building: 'A', name: 'เครื่องอัดไฮดรอลิกขึ้นรูปโลหะ A2 (Hydraulic Forming Press A2)' },
-    { code: 'A-M011', building: 'A', name: 'ระบบสายพานลำเลียงอัตโนมัติสายหลัก A (Automated Conveyor Line A)' },
-    { code: 'A-M012', building: 'A', name: 'ตู้ควบคุมไฟฟ้าหลักและหม้อแปลงอาคาร A (Main MDB & Transformer A)' },
-
-    { code: 'B-M001', building: 'B', name: 'เครื่องปั๊มลมแรงดันสูงอาคาร B1 (High-Pressure Air Compressor B1)' },
-    { code: 'B-M002', building: 'B', name: 'เครื่องปั๊มลมแรงดันสูงอาคาร B2 (High-Pressure Air Compressor B2)' },
-    { code: 'B-M003', building: 'B', name: 'เครื่องทำน้ำเย็นชิลเลอร์อาคาร B1 (Process Chiller Unit B1)' },
-    { code: 'B-M004', building: 'B', name: 'เครื่องทำน้ำเย็นชิลเลอร์อาคาร B2 (Process Chiller Unit B2)' },
-    { code: 'B-M005', building: 'B', name: 'ปั๊มหมุนเวียนน้ำเย็นระบบปิด B1 (Chilled Water Circulating Pump B1)' },
-    { code: 'B-M006', building: 'B', name: 'ปั๊มหมุนเวียนน้ำเย็นระบบปิด B2 (Chilled Water Circulating Pump B2)' },
-    { code: 'B-M007', building: 'B', name: 'เครื่องทำลมแห้งดูดความชื้น B1 (Desiccant Air Dryer B1)' },
-    { code: 'B-M008', building: 'B', name: 'หอผึ่งน้ำหล่อเย็นอาคาร B (Cooling Tower Unit B)' },
-    { code: 'B-M009', building: 'B', name: 'เครื่องฉีดพลาสติกอัตโนมัติ B1 (Injection Molding Machine B1)' },
-    { code: 'B-M010', building: 'B', name: 'เครื่องฉีดพลาสติกอัตโนมัติ B2 (Injection Molding Machine B2)' },
-    { code: 'B-M011', building: 'B', name: 'เครื่องบรรจุและซีลสุญญากาศอัตโนมัติ B (Auto Vacuum Packaging Unit B)' },
-    { code: 'B-M012', building: 'B', name: 'เครื่องกำเนิดไฟฟ้าสำรองและตู้ควบคุม B (Backup Generator & ATS B)' }
-];
-
-const CHECKLIST_CATEGORIES = [
-    {
-        catCode: '01', catClass: 'cat-01', catName: 'ระบบแรงดันและระบบท่อ',
-        items: [
-            { id: 1, seq: 1, title: 'ตรวจสอบแรงดันด้านขาดูด (4-8 bar)', hasMeasurement: true, unit: 'bar', placeholder: 'เช่น 6.5' },
-            { id: 2, seq: 2, title: 'ตรวจสอบแรงดันด้านจ่าย (12-18 bar)', hasMeasurement: true, unit: 'bar', placeholder: 'เช่น 15.0' },
-            { id: 3, seq: 3, title: 'ตรวจสอบการรั่วซึมของท่อและข้อต่อ', hasMeasurement: false, unit: '' },
-            { id: 4, seq: 4, title: 'ตรวจสอบการทำงานของวาล์วควบคุม', hasMeasurement: false, unit: '' }
-        ]
-    },
-    {
-        catCode: '02', catClass: 'cat-02', catName: 'ระบบทำความเย็นและอุณหภูมิ',
-        items: [
-            { id: 5, seq: 1, title: 'ตรวจสอบอุณหภูมิน้ำเข้า (10-15 °C)', hasMeasurement: true, unit: '°C', placeholder: 'เช่น 12' },
-            { id: 6, seq: 2, title: 'ตรวจสอบอุณหภูมิน้ำออก (5-9 °C)', hasMeasurement: true, unit: '°C', placeholder: 'เช่น 7' },
-            { id: 7, seq: 3, title: 'ตรวจสอบเสียงและแรงสั่นสะเทือนของเครื่อง', hasMeasurement: false, unit: '' },
-            { id: 8, seq: 4, title: 'ตรวจสอบระดับน้ำยาและการรั่วซึม', hasMeasurement: false, unit: '' }
-        ]
-    },
-    {
-        catCode: '03', catClass: 'cat-03', catName: 'ระบบไฟฟ้าและการควบคุม',
-        items: [
-            { id: 9, seq: 1, title: 'ตรวจสอบแรงดันไฟฟ้า (360-400 V)', hasMeasurement: true, unit: 'V', placeholder: 'เช่น 380' },
-            { id: 10, seq: 2, title: 'ตรวจสอบกระแสไฟฟ้า (35-55 A)', hasMeasurement: true, unit: 'A', placeholder: 'เช่น 45.2' },
-            { id: 11, seq: 3, title: 'ตรวจสอบการทำงานของตู้ควบคุมไฟฟ้า', hasMeasurement: false, unit: '' },
-            { id: 12, seq: 4, title: 'ตรวจสอบปุ่มหยุดฉุกเฉินและระบบป้องกัน', hasMeasurement: false, unit: '' }
-        ]
-    },
-    {
-        catCode: '04', catClass: 'cat-04', catName: 'ระบบทั่วไปและความปลอดภัย',
-        items: [
-            { id: 13, seq: 1, title: 'ตรวจสอบสภาพภายนอกของเครื่องจักร', hasMeasurement: false, unit: '' },
-            { id: 14, seq: 2, title: 'ตรวจสอบระดับน้ำมันและระบบหล่อลื่น', hasMeasurement: false, unit: '' },
-            { id: 15, seq: 3, title: 'ตรวจสอบความสะอาดและการทำงานโดยรวม', hasMeasurement: false, unit: '' }
-        ]
-    }
-];
+function groupQuestionsIntoCategories(questionsList) {
+    const map = new Map();
+    questionsList.forEach(q => {
+        const key = `${q.catCode || '04'}|${q.catName || 'หมวดทั่วไป'}`;
+        if (!map.has(key)) {
+            map.set(key, {
+                catCode: q.catCode || '04',
+                catClass: q.catClass || `cat-${q.catCode || '04'}`,
+                catName: q.catName || 'หมวดทั่วไป',
+                items: []
+            });
+        }
+        map.get(key).items.push({
+            id: q.id,
+            seq: q.seq,
+            title: q.title,
+            hasMeasurement: Boolean(q.hasMeasurement),
+            unit: q.unit || '',
+            placeholder: q.placeholder || ''
+        });
+    });
+    return Array.from(map.values());
+}
 
 const DEIStorage = {
-    init() {
-        // คงฟังก์ชันไว้เพื่อไม่ให้โค้ดอื่น error แต่ไม่ต้องใช้ localStorage แล้ว
+    async init() {
+        await Promise.all([
+            this.loadMachines(),
+            this.loadQuestions()
+        ]);
+    },
+
+    async loadMachines() {
+        try {
+            const res = await fetch('/api/machines');
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                CACHED_MACHINES = data;
+            }
+        } catch (e) {
+            console.error('Error loading machines:', e);
+        }
+        return CACHED_MACHINES;
+    },
+
+    async loadQuestions() {
+        try {
+            const res = await fetch('/api/questions');
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                CACHED_QUESTIONS = data;
+            }
+        } catch (e) {
+            console.error('Error loading questions:', e);
+        }
+        return CACHED_QUESTIONS;
     },
 
     getMachines() {
-        return DEFAULT_MACHINES;
-    },
-    getMachinesByBuilding(b) {
-        return this.getMachines().filter(m => m.building === b);
-    },
-    getMachineByCode(c) {
-        return this.getMachines().find(m => m.code === c) || null;
+        return CACHED_MACHINES;
     },
 
-    // เปลี่ยนมาดึงข้อมูลผ่าน Server API (ใช้ async/await)
+    getMachinesByBuilding(b) {
+        return CACHED_MACHINES.filter(m => m.building === b);
+    },
+
+    getMachineByCode(c) {
+        return CACHED_MACHINES.find(m => m.code === c) || null;
+    },
+
+    getQuestions() {
+        return CACHED_QUESTIONS;
+    },
+
+    getChecklistCategories() {
+        return groupQuestionsIntoCategories(CACHED_QUESTIONS);
+    },
+
+    async addMachine(payload) {
+        const res = await fetch('/api/machines', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) await this.loadMachines();
+        return data;
+    },
+
+    async deleteMachine(id) {
+        const res = await fetch(`/api/machines/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok && data.success) await this.loadMachines();
+        return data;
+    },
+
+    async addQuestion(payload) {
+        const res = await fetch('/api/questions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) await this.loadQuestions();
+        return data;
+    },
+
+    async updateQuestion(id, payload) {
+        const res = await fetch(`/api/questions/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) await this.loadQuestions();
+        return data;
+    },
+
+    async deleteQuestion(id) {
+        const res = await fetch(`/api/questions/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok && data.success) await this.loadQuestions();
+        return data;
+    },
+
     async getInspections() {
         try {
             const res = await fetch('/api/inspections');
@@ -133,7 +173,6 @@ const DEIStorage = {
         return list.find(i => i.machineCode === code && i.inspectionDate === dateISO) || null;
     },
 
-    // เปลี่ยนมาบันทึกข้อมูลผ่าน Server API (POST)
     async upsertInspection(record) {
         try {
             const res = await fetch('/api/inspections', {
@@ -148,7 +187,6 @@ const DEIStorage = {
         }
     },
 
-    // เปลี่ยนมาอัปเดตสถานะอนุมัติผ่าน Server API (PUT)
     async approveInspection(id, approver) {
         if (!approver || !approver.trim()) return { success: false, message: 'กรุณาเลือกชื่อผู้อนุมัติ' };
         try {
@@ -169,7 +207,8 @@ const DEIStorage = {
     },
 
     async getTodayDashboardStats() {
-        const totalMachines = 24;
+        await this.loadMachines();
+        const totalMachines = CACHED_MACHINES.length || 24;
         const todayISO = this.getTodayISO();
         const inspections = await this.getInspections();
         const todayInspections = inspections.filter(i => i.inspectionDate === todayISO);

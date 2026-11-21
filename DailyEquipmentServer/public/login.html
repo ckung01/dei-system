@@ -99,6 +99,40 @@
             font-size: 0.88rem;
             text-align: center;
         }
+        .waiting-approval-box {
+            text-align: center;
+            padding: 16px 8px;
+        }
+        .waiting-spinner {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #1d4ed8;
+            border-radius: 50%;
+            animation: spinWait 1s linear infinite;
+        }
+        @keyframes spinWait {
+            to { transform: rotate(360deg); }
+        }
+        .waiting-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        .waiting-sub {
+            font-size: 0.92rem;
+            color: #475569;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+        .waiting-timer {
+            font-size: 0.86rem;
+            color: #1d4ed8;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body>
@@ -130,7 +164,7 @@
                 <button type="button" class="auth-tab-btn" id="tabRegisterBtn">สมัครสมาชิก</button>
             </div>
 
-            <!-- 1. ฟอร์มเข้าสู่ระบบ (ไม่มีช่องเลือกสิทธิ์ 1-3) -->
+            <!-- 1. ฟอร์มเข้าสู่ระบบ -->
             <form id="loginForm" class="auth-form">
                 <div class="form-group">
                     <label for="loginUsername">ชื่อผู้ใช้งาน (Username) <span class="required">*</span></label>
@@ -177,7 +211,19 @@
                 <div id="registerMsg" class="auth-msg"></div>
             </form>
 
-            <!-- 3. หน้าลืมรหัสผ่าน: ใส่อีเมลเพื่อส่งรหัสยืนยัน และกรอกรหัสยืนยัน -->
+            <!-- 2.1 หน้าโหลดรออนุมัติประมาณ 1-2 นาที หลังสมัครสมาชิกเสร็จ -->
+            <div id="waitingApprovalView" class="waiting-approval-box hidden">
+                <div class="waiting-spinner"></div>
+                <div class="waiting-title">สมัครสมาชิกเรียบร้อยแล้ว</div>
+                <div class="waiting-sub">
+                    รอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที<br>
+                    เมื่อผู้ดูแลระบบกดอนุมัติแล้ว ระบบจะพาเข้าใช้งานอัตโนมัติครับ
+                </div>
+                <div class="waiting-timer" id="waitingElapsedText">กำลังรอการอนุมัติ... (0:00)</div>
+                <button type="button" class="link-btn" id="backToLoginFromWaitingBtn">กลับไปหน้าเข้าสู่ระบบ</button>
+            </div>
+
+            <!-- 3. หน้าลืมรหัสผ่าน -->
             <form id="forgotForm" class="auth-form hidden">
                 <div class="form-group">
                     <label for="forgotEmail">อีเมลที่ใช้สมัครสมาชิก <span class="required">*</span></label>
@@ -200,7 +246,7 @@
                 <div id="forgotErrorMsg" class="auth-msg"></div>
             </form>
 
-            <!-- 4. หน้าตั้งรหัสผ่านใหม่ + ยืนยันรหัสผ่านใหม่ -->
+            <!-- 4. หน้าตั้งรหัสผ่านใหม่ -->
             <form id="resetPasswordForm" class="auth-form hidden">
                 <div class="form-group">
                     <label for="newPasswordInput">รหัสผ่านใหม่ <span class="required">*</span></label>
@@ -236,6 +282,8 @@
 
             const loginForm = document.getElementById('loginForm');
             const registerForm = document.getElementById('registerForm');
+            const waitingApprovalView = document.getElementById('waitingApprovalView');
+            const waitingElapsedText = document.getElementById('waitingElapsedText');
             const forgotForm = document.getElementById('forgotForm');
             const resetPasswordForm = document.getElementById('resetPasswordForm');
 
@@ -250,10 +298,21 @@
 
             let verifiedEmail = '';
             let verifiedCode = '';
+            let approvalPollTimer = null;
+            let approvalElapsedTimer = null;
+
+            function stopWaitingTimers() {
+                if (approvalPollTimer) clearInterval(approvalPollTimer);
+                if (approvalElapsedTimer) clearInterval(approvalElapsedTimer);
+                approvalPollTimer = null;
+                approvalElapsedTimer = null;
+            }
 
             function showView(mode) {
+                stopWaitingTimers();
                 loginForm.classList.add('hidden');
                 registerForm.classList.add('hidden');
+                waitingApprovalView.classList.add('hidden');
                 forgotForm.classList.add('hidden');
                 resetPasswordForm.classList.add('hidden');
 
@@ -277,6 +336,11 @@
                     authTitle.textContent = 'สมัครสมาชิก';
                     authSubtitle.textContent = 'กรอกข้อมูลผู้ใช้งานและเลือกสิทธิ์ 1 ใน 3 ข้อ';
                     registerForm.classList.remove('hidden');
+                } else if (mode === 'waiting') {
+                    authTabsBox.classList.add('hidden');
+                    authTitle.textContent = 'รอผู้ดูแลระบบอนุมัติ';
+                    authSubtitle.textContent = 'กรุณารอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที';
+                    waitingApprovalView.classList.remove('hidden');
                 } else if (mode === 'forgot') {
                     authTabsBox.classList.add('hidden');
                     authTitle.textContent = 'ลืมรหัสผ่าน';
@@ -288,6 +352,40 @@
                     authSubtitle.textContent = 'กรอกรหัสผ่านใหม่และยืนยันรหัสผ่านใหม่อีกครั้ง';
                     resetPasswordForm.classList.remove('hidden');
                 }
+            }
+
+            function startWaitingForApproval(registeredUser) {
+                showView('waiting');
+                let seconds = 0;
+                waitingElapsedText.textContent = 'รอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที (0:00)';
+
+                approvalElapsedTimer = setInterval(() => {
+                    seconds++;
+                    const mins = Math.floor(seconds / 60);
+                    const secs = String(seconds % 60).padStart(2, '0');
+                    waitingElapsedText.textContent = `รอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที (${mins}:${secs})`;
+                }, 1000);
+
+                approvalPollTimer = setInterval(async () => {
+                    try {
+                        const query = new URLSearchParams({
+                            username: registeredUser.username || '',
+                            email: registeredUser.email || ''
+                        });
+                        const res = await fetch(`/api/auth/approval-status?${query.toString()}`);
+                        const data = await res.json();
+                        if (res.ok && data.success && data.approvalStatus === 'approved') {
+                            stopWaitingTimers();
+                            DEIAuth.setUser(data.user, true);
+                            waitingElapsedText.textContent = 'ได้รับการอนุมัติแล้ว! กำลังเข้าใช้งานระบบ...';
+                            setTimeout(() => {
+                                window.location.href = DEIAuth.getHomePageByRole(data.user.role);
+                            }, 500);
+                        }
+                    } catch (err) {
+                        // รอรอบถัดไป
+                    }
+                }, 3000);
             }
 
             if (prefill && prefill.username) {
@@ -302,6 +400,7 @@
             tabRegisterBtn.addEventListener('click', () => showView('register'));
             document.getElementById('goForgotBtn').addEventListener('click', () => showView('forgot'));
             document.getElementById('backToLoginFromForgotBtn').addEventListener('click', () => showView('login'));
+            document.getElementById('backToLoginFromWaitingBtn').addEventListener('click', () => showView('login'));
 
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -340,13 +439,9 @@
                 try {
                     const res = await DEIAuth.register({ fullName, username, email, password, role });
                     if (res.success) {
-                        registerMsg.style.color = '#16a34a';
-                        registerMsg.textContent = 'สมัครสมาชิกสำเร็จ! กำลังพาไปหน้าเข้าสู่ระบบ...';
-                        setTimeout(() => {
-                            loginUsername.value = username;
-                            loginPassword.value = '';
-                            showView('login');
-                        }, 700);
+                        loginUsername.value = username;
+                        loginPassword.value = password;
+                        startWaitingForApproval({ username, email });
                     } else {
                         registerMsg.style.color = '#dc2626';
                         registerMsg.textContent = res.message || 'สมัครสมาชิกไม่สำเร็จ';

@@ -4,16 +4,16 @@ let CACHED_QUESTIONS = [];
 function groupQuestionsIntoCategories(questionsList) {
     if (!Array.isArray(questionsList) || questionsList.length === 0) return [];
     return [{
-        catCode: '01',
+        catCode: 'ALL',
         catClass: 'cat-01',
-        catName: 'รายการตรวจสอบเครื่องจักรประจำวัน',
+        catName: 'รายการตรวจสอบเครื่องจักรทั้งหมด',
         items: questionsList.map((q, idx) => ({
             id: q.id,
-            seq: q.seq || (idx + 1),
+            seq: idx + 1,
             title: q.title,
             hasMeasurement: Boolean(q.hasMeasurement),
             unit: q.unit || '',
-            placeholder: q.placeholder || ''
+            placeholder: q.placeholder || '8-12'
         }))
     }];
 }
@@ -190,6 +190,23 @@ const DEIStorage = {
         }
     },
 
+    async rejectInspection(id, approver, rejectReason = '') {
+        try {
+            const res = await fetch(`/api/inspections/${id}/reject`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    approverName: (approver || 'ผู้อนุมัติ').trim(),
+                    rejectReason: (rejectReason || 'ไม่ผ่านการอนุมัติ').trim()
+                })
+            });
+            return await res.json();
+        } catch (e) {
+            console.error('Error rejecting inspection:', e);
+            return { success: false };
+        }
+    },
+
     async getTodayDashboardStats() {
         await this.loadMachines();
         const totalMachines = CACHED_MACHINES.length || 24;
@@ -274,7 +291,9 @@ function buildInspectionDetailHTML(record) {
     };
     const approvalBadge = record.approvalStatus === 'อนุมัติแล้ว'
         ? '<span class="status-pill approved">อนุมัติแล้ว</span>'
-        : '<span class="status-pill pending">รออนุมัติ</span>';
+        : record.approvalStatus === 'ไม่อนุมัติ'
+            ? '<span class="status-pill" style="background:#fee2e2;color:#dc2626;">ไม่อนุมัติ</span>'
+            : '<span class="status-pill pending">รออนุมัติ</span>';
 
     let rows = '';
     (record.items || []).forEach((item, idx) => {

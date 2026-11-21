@@ -1,184 +1,214 @@
+/**
+- Daily Equipment Inspection System - หน้าที่สอง: รายการรออนุมัติ (approval.html)
+- ฉบับปรับปรุงรองรับ Server API (Async/Await) 100%
+ */
+
 document.addEventListener('DOMContentLoaded', async () => {
-    await DEIStorage.init();
+    DEIStorage.init();
     await DEIStorage.renderSharedHeaderAndDashboard();
 
-    const pendingContainer = document.getElementById('pendingListContainer');
-    const approvedContainer = document.getElementById('approvedListContainer');
-    const pendingBadge = document.getElementById('pendingCountBadge');
-    const approvedBadge = document.getElementById('approvedCountBadge');
+    const pendingListContainer = document.getElementById('pendingListContainer');
+    const approvedListContainer = document.getElementById('approvedListContainer');
+    const pendingCountBadge = document.getElementById('pendingCountBadge');
+    const approvedCountBadge = document.getElementById('approvedCountBadge');
 
-    const confirmModal = document.getElementById('approvalConfirmModal');
+    const approvalConfirmModal = document.getElementById('approvalConfirmModal');
     const approvalModalBody = document.getElementById('approvalModalBody');
-    const confirmApprovalBtn = document.getElementById('confirmApprovalBtn');
-    const cancelApprovalBtn = document.getElementById('cancelApprovalBtn');
     const closeApprovalModalBtn = document.getElementById('closeApprovalModalBtn');
+    const cancelApprovalBtn = document.getElementById('cancelApprovalBtn');
+    const confirmApprovalBtn = document.getElementById('confirmApprovalBtn');
 
-    const detailModal = document.getElementById('inspectionDetailModal');
+    const inspectionDetailModal = document.getElementById('inspectionDetailModal');
     const detailModalBody = document.getElementById('detailModalBody');
     const closeDetailModalBtn = document.getElementById('closeDetailModalBtn');
     const okDetailModalBtn = document.getElementById('okDetailModalBtn');
 
-    let selectedRecordId = null;
+    let currentTargetId = null;
 
     async function renderLists() {
+        // ดึงข้อมูลผ่าน Server API แบบ async/await
         const all = await DEIStorage.getInspections();
-        const pending = all.filter(r => r.approvalStatus === 'รออนุมัติ');
-        const approved = all.filter(r => r.approvalStatus === 'อนุมัติแล้ว' || r.approvalStatus === 'ไม่อนุมัติ');
+  const todayISO = DEIStorage.getTodayISO(); // ดึงวันที่ปัจจุบัน (เช่น '2026-11-18')
 
-        if (pendingBadge) pendingBadge.textContent = pending.length;
-        if (approvedBadge) approvedBadge.textContent = approved.length;
+  // กรองเฉพาะรายการที่เป็นของ "วันนี้" และรออนุมัติ
+  const pending = all.filter(i => i.approvalStatus === 'รออนุมัติ' && i.inspectionDate === todayISO);
+  const approved = all.filter(i => i.approvalStatus === 'อนุมัติแล้ว' && i.inspectionDate === todayISO);
+        pendingCountBadge.textContent = pending.length;
+        approvedCountBadge.textContent = approved.length;
 
-        pendingContainer.innerHTML = pending.length
-            ? pending.map(r => buildCardHTML(r, true)).join('')
-            : '<div class="empty-box">ไม่มีรายการรออนุมัติ</div>';
+        // 1. Render รายการรออนุมัติ
+        if (pending.length === 0) {
+            pendingListContainer.innerHTML = `<div class="empty-data-card">ไม่มีรายการรออนุมัติในขณะนี้</div>`;
+        } else {
+            pendingListContainer.innerHTML = pending.map(r => createPendingCardHTML(r)).join('');
+        }
 
-        approvedContainer.innerHTML = approved.length
-            ? approved.map(r => buildCardHTML(r, false)).join('')
-            : '<div class="empty-box">ยังไม่มีรายการที่ดำเนินการแล้ว</div>';
+        // 2. Render รายการที่อนุมัติแล้ว
+        if (approved.length === 0) {
+            approvedListContainer.innerHTML = `<div class="empty-data-card">ยังไม่มีรายการที่อนุมัติแล้ว</div>`;
+        } else {
+            const groupedApproved = {};
+            approved.forEach(item => {
+                const dateKey = item.inspectionDate ? String(item.inspectionDate).split('T')[0] : '';
+                if (!groupedApproved[dateKey]) {
+                    groupedApproved[dateKey] = [];
+                }
+                groupedApproved[dateKey].push(item);
+            });
 
-        bindCardActions(all);
+            const sortedDates = Object.keys(groupedApproved).sort((a, b) => b.localeCompare(a));
+            let approvedHTML = '';
+
+            sortedDates.forEach(dateISO => {
+                const listOnDate = groupedApproved[dateISO];
+                listOnDate.sort((a, b) => a.machineCode.localeCompare(b.machineCode));
+
+                const itemsRows = listOnDate.map((rec, idx) => `
+                    <div class="compact-history-row is-approved">
+                        <div class="compact-col-no">${idx + 1}</div>
+                        <div class="compact-col-machine">
+                            <span class="text-blue font-weight-600">อาคาร ${rec.building} | ${rec.machineCode}</span>
+                            <span class="compact-machine-name">${rec.machineName}</span>
+                        </div>
+                        <div class="compact-col-info">
+                            <span>เวลา: ${rec.inspectionTime} น. | ช่าง: ${rec.inspectorName}</span>
+                            <span>ผู้อนุมัติ: <strong class="text-green">${rec.approverName || '-'}</strong></span>
+                        </div>
+                        <div class="compact-col-stats">
+                            <span class="mini-stat normal">ปกติ: ${rec.summary.normal}</span>
+                            <span class="mini-stat warning">เฝ้าระวัง: ${rec.summary.warning}</span>
+                            <span class="mini-stat abnormal">ผิดปกติ: ${rec.summary.abnormal}</span>
+                        </div>
+                        <div class="compact-col-status">
+                            <span class="compact-pill approved">อนุมัติแล้ว</span>
+                        </div>
+                        <div class="compact-col-action">
+                            <button type="button" class="btn btn-outline btn-sm btn-view-detail" data-id="${rec.id}">ดูรายละเอียด (15 ข้อ)</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                approvedHTML += `
+                    <div class="history-date-card-wrapper">
+                        <div class="history-date-card-header">
+                            <span>📅 วันที่ ${DEIStorage.formatThaiDateOnly(dateISO)}</span>
+                            <span class="badge-count-machine">อนุมัติแล้ว ${listOnDate.length} เครื่อง</span>
+                        </div>
+                        <div class="history-card-body-compact">
+                            ${itemsRows}
+                        </div>
+                    </div>
+                `;
+            });
+
+            approvedListContainer.innerHTML = approvedHTML;
+        }
+
+        await bindButtons();
     }
 
-    function buildCardHTML(rec, isPending) {
-        const statusBadge = rec.approvalStatus === 'อนุมัติแล้ว'
-            ? '<span class="status-pill approved">อนุมัติแล้ว</span>'
-            : rec.approvalStatus === 'ไม่อนุมัติ'
-                ? '<span class="status-pill" style="background:#fee2e2;color:#dc2626;">ไม่อนุมัติ</span>'
-                : '<span class="status-pill pending">รออนุมัติ</span>';
-
+    function createPendingCardHTML(record) {
         return `
-            <div class="approval-card">
-                <div class="approval-card-main">
-                    <div class="approval-card-top">
-                        <strong>${rec.machineCode} - ${rec.machineName}</strong>
-                        ${statusBadge}
+            <article class="record-card">
+                <div class="record-card-top">
+                    <div>
+                        <div class="record-machine-title">อาคาร ${record.building} | <span class="text-blue">${record.machineCode}</span> - ${record.machineName}</div>
+                        <div class="record-meta-line">
+                            <span>วันที่: ${DEIStorage.formatThaiDateOnly(record.inspectionDate)} (${record.inspectionTime} น.)</span>
+                            <span>ช่าง: ${record.inspectorName}</span>
+                        </div>
                     </div>
-                    <div class="approval-card-meta">
-                        <span>อาคาร ${rec.building}</span>
-                        <span>วันที่: ${DEIStorage.formatThaiDateOnly(rec.inspectionDate)} (${rec.inspectionTime || ''})</span>
-                        <span>ผู้ตรวจ: ${rec.inspectorName || '-'}</span>
-                        ${rec.approverName ? `<span>ผู้อนุมัติ: ${rec.approverName}</span>` : ''}
-                        ${rec.rejectReason ? `<span style="color:#dc2626;">เหตุผล: ${rec.rejectReason}</span>` : ''}
-                    </div>
-                    <div class="approval-summary-line">
-                        <span>ปกติ: <strong>${rec.summary?.normal ?? 0}</strong></span>
-                        <span>เฝ้าระวัง: <strong>${rec.summary?.warning ?? 0}</strong></span>
-                        <span>ผิดปกติ: <strong>${rec.summary?.abnormal ?? 0}</strong></span>
+                    <span class="status-pill pending">รออนุมัติ</span>
+                </div>
+                <div class="record-summary-strip">
+                    <span class="mini-stat normal">ปกติ: ${record.summary.normal}</span>
+                    <span class="mini-stat warning">เฝ้าระวัง: ${record.summary.warning}</span>
+                    <span class="mini-stat abnormal">ผิดปกติ: ${record.summary.abnormal}</span>
+                </div>
+                <div class="record-card-actions">
+                    <div class="action-buttons-right" style="margin-left:0;">
+                        <button type="button" class="btn btn-outline btn-sm btn-view-detail" data-id="${record.id}">ดูรายละเอียด (15 ข้อ)</button>
+                        <button type="button" class="btn btn-success btn-sm btn-open-approve" data-id="${record.id}">อนุมัติ</button>
                     </div>
                 </div>
-                <div class="approval-card-actions">
-                    <button type="button" class="btn btn-secondary btn-detail-view" data-id="${rec.id}">ดูรายละเอียด</button>
-                    ${isPending ? `
-                        <button type="button" class="btn btn-success btn-open-approve" data-id="${rec.id}">อนุมัติ</button>
-                        <button type="button" class="btn btn-danger btn-open-reject" data-id="${rec.id}" style="background:#dc2626;color:#fff;">ไม่อนุมัติ</button>
-                    ` : ''}
-                </div>
-            </div>
+            </article>
         `;
     }
 
-    function bindCardActions(allRecords) {
-        document.querySelectorAll('.btn-detail-view').forEach(btn => {
+    async function bindButtons() {
+        const allInspections = await DEIStorage.getInspections();
+
+        document.querySelectorAll('.btn-view-detail').forEach(btn => {
             btn.addEventListener('click', () => {
-                const rec = allRecords.find(r => String(r.id) === String(btn.dataset.id));
+                const rec = allInspections.find(r => r.id === btn.dataset.id);
                 if (!rec) return;
                 detailModalBody.innerHTML = buildInspectionDetailHTML(rec);
-                detailModal.classList.remove('hidden');
+                inspectionDetailModal.classList.remove('hidden');
             });
         });
 
         document.querySelectorAll('.btn-open-approve').forEach(btn => {
             btn.addEventListener('click', () => {
-                const rec = allRecords.find(r => String(r.id) === String(btn.dataset.id));
+                const rec = allInspections.find(r => r.id === btn.dataset.id);
                 if (!rec) return;
-                selectedRecordId = rec.id;
-                const currentUser = DEIAuth.getUser();
-                const defaultName = currentUser?.fullName || 'นภาพร สุขสวัสดิ์';
-
-                approvalModalBody.innerHTML = `
-                    <p style="margin-bottom:10px;">ยืนยันการอนุมัติรายการตรวจเช็กของเครื่อง <strong>${rec.machineCode} - ${rec.machineName}</strong></p>
-                    <div class="form-group">
-                        <label for="approverNameInput">ชื่อผู้อนุมัติ</label>
-                        <input type="text" id="approverNameInput" class="form-control" value="${defaultName}">
-                    </div>
-                `;
-                confirmApprovalBtn.textContent = 'ยืนยันอนุมัติ';
-                confirmApprovalBtn.className = 'btn btn-success';
-                confirmApprovalBtn.dataset.mode = 'approve';
-                confirmModal.classList.remove('hidden');
+                currentTargetId = rec.id;
+                openModal(rec);
             });
         });
+    }
 
-        document.querySelectorAll('.btn-open-reject').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const rec = allRecords.find(r => String(r.id) === String(btn.dataset.id));
-                if (!rec) return;
-                selectedRecordId = rec.id;
-                const currentUser = DEIAuth.getUser();
-                const defaultName = currentUser?.fullName || 'นภาพร สุขสวัสดิ์';
+    function openModal(record) {
+        const settings = DEIStorage.getSettings();
+        const savedApprover = settings.lastSelectedApprover || '';
 
-                approvalModalBody.innerHTML = `
-                    <p style="margin-bottom:10px;">ระบุเหตุผลที่ไม่ผ่านการอนุมัติสำหรับเครื่อง <strong>${rec.machineCode} - ${rec.machineName}</strong></p>
-                    <div class="form-group" style="margin-bottom:10px;">
-                        <label for="approverNameInput">ชื่อผู้อนุมัติ</label>
-                        <input type="text" id="approverNameInput" class="form-control" value="${defaultName}">
-                    </div>
-                    <div class="form-group">
-                        <label for="rejectReasonInput">เหตุผลที่ไม่อนุมัติ</label>
-                        <input type="text" id="rejectReasonInput" class="form-control" placeholder="เช่น ข้อมูลไม่ครบถ้วน / ต้องตรวจซ้ำ">
-                    </div>
-                `;
-                confirmApprovalBtn.textContent = 'ยืนยันไม่อนุมัติ';
-                confirmApprovalBtn.className = 'btn btn-danger';
-                confirmApprovalBtn.style.background = '#dc2626';
-                confirmApprovalBtn.style.color = '#fff';
-                confirmApprovalBtn.dataset.mode = 'reject';
-                confirmModal.classList.remove('hidden');
-            });
-        });
+        approvalModalBody.innerHTML = `
+            <div class="form-group" style="margin-bottom:16px;">
+                <label for="modalApproverSelect">เลือกชื่อผู้อนุมัติรายการตรวจสอบ <span class="required">*</span></label>
+                <select id="modalApproverSelect" class="form-control">
+                    <option value="">-- กรุณาเลือกชื่อผู้อนุมัติ --</option>
+                    <option value="นายสมชาย ใจดี" ${savedApprover === 'นายสมชาย ใจดี' ? 'selected' : ''}>นายสมชาย ใจดี</option>
+                    <option value="นายวิชัย พัฒนกิจ" ${savedApprover === 'นายวิชัย พัฒนกิจ' ? 'selected' : ''}>นายวิชัย พัฒนกิจ</option>
+                    <option value="นางสาวสุภาวดี ศรีสุข" ${savedApprover === 'นางสาวสุภาวดี ศรีสุข' ? 'selected' : ''}>นางสาวสุภาวดี ศรีสุข</option>
+                </select>
+            </div>
+            <table class="confirm-summary-table">
+                <tr><td>รหัสเครื่องจักร</td><td class="text-blue">${record.machineCode}</td></tr>
+                <tr><td>ชื่อเครื่องจักร</td><td>${record.machineName}</td></tr>
+                <tr><td>ช่างผู้ตรวจสอบ</td><td>${record.inspectorName}</td></tr>
+            </table>
+        `;
+        approvalConfirmModal.classList.remove('hidden');
     }
 
     confirmApprovalBtn.addEventListener('click', async () => {
-        if (!selectedRecordId) return;
-        const mode = confirmApprovalBtn.dataset.mode || 'approve';
-        const approverName = document.getElementById('approverNameInput')?.value.trim() || 'ผู้อนุมัติ';
+        const select = document.getElementById('modalApproverSelect');
+        const approverName = select ? select.value : '';
 
-        if (mode === 'reject') {
-            const reason = document.getElementById('rejectReasonInput')?.value.trim() || 'ไม่ผ่านการอนุมัติ';
-            const res = await DEIStorage.rejectInspection(selectedRecordId, approverName, reason);
-            if (res && res.success) {
-                showToast('บันทึกรายการ "ไม่อนุมัติ" เรียบร้อยแล้ว', 'warning');
-                confirmModal.classList.add('hidden');
-                selectedRecordId = null;
-                await renderLists();
-                await DEIStorage.renderSharedHeaderAndDashboard();
-            } else {
-                showToast(res?.message || 'ดำเนินการไม่อนุมัติไม่สำเร็จ', 'error');
-            }
+        if (!approverName) {
+            showToast('กรุณาเลือกชื่อผู้อนุมัติก่อนยืนยัน', 'error');
+            if (select) select.focus();
             return;
         }
 
-        const res = await DEIStorage.approveInspection(selectedRecordId, approverName);
+        DEIStorage.updateSettings({ lastSelectedApprover: approverName });
+
+        // รอรับค่าจากการเรียก API อนุมัติแบบ async
+        const res = await DEIStorage.approveInspection(currentTargetId, approverName);
+        approvalConfirmModal.classList.add('hidden');
+
         if (res && res.success) {
-            showToast('อนุมัติผลการตรวจสอบเรียบร้อยแล้ว', 'success');
-            confirmModal.classList.add('hidden');
-            selectedRecordId = null;
-            await renderLists();
+            showToast('อนุมัติผลการตรวจสอบสำเร็จ', 'success');
             await DEIStorage.renderSharedHeaderAndDashboard();
+            await renderLists();
         } else {
-            showToast(res?.message || 'อนุมัติไม่สำเร็จ', 'error');
+            showToast((res && res.message) ? res.message : 'เกิดข้อผิดพลาดในการอนุมัติ', 'error');
         }
     });
 
-    function closeConfirmModal() {
-        confirmModal.classList.add('hidden');
-        selectedRecordId = null;
-    }
-
-    cancelApprovalBtn.addEventListener('click', closeConfirmModal);
-    closeApprovalModalBtn.addEventListener('click', closeConfirmModal);
-    closeDetailModalBtn.addEventListener('click', () => detailModal.classList.add('hidden'));
-    okDetailModalBtn.addEventListener('click', () => detailModal.classList.add('hidden'));
+    closeApprovalModalBtn.addEventListener('click', () => approvalConfirmModal.classList.add('hidden'));
+    cancelApprovalBtn.addEventListener('click', () => approvalConfirmModal.classList.add('hidden'));
+    closeDetailModalBtn.addEventListener('click', () => inspectionDetailModal.classList.add('hidden'));
+    okDetailModalBtn.addEventListener('click', () => inspectionDetailModal.classList.add('hidden'));
 
     await renderLists();
 });

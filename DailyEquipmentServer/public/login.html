@@ -426,31 +426,38 @@
             });
 
             registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                registerMsg.style.color = '#475569';
-                registerMsg.textContent = 'กำลังบันทึกข้อมูลสมัครสมาชิก...';
+              e.preventDefault();
+              registerMsg.style.color = '#475569';
+              registerMsg.textContent = 'กำลังบันทึกข้อมูลสมัครสมาชิก...';
 
-                const fullName = document.getElementById('regFullName').value.trim();
-                const username = document.getElementById('regUsername').value.trim();
-                const email = document.getElementById('regEmail').value.trim().toLowerCase();
-                const password = document.getElementById('regPassword').value;
-                const role = document.getElementById('regRole').value;
+              const fullName = document.getElementById('regFullName').value.trim();
+              const username = document.getElementById('regUsername').value.trim();
+              const email = document.getElementById('regEmail').value.trim().toLowerCase();
+              const password = document.getElementById('regPassword').value;
+              const role = document.getElementById('regRole').value;
 
-                try {
-                    const res = await DEIAuth.register({ fullName, username, email, password, role });
-                    if (res.success) {
-                        loginUsername.value = username;
-                        loginPassword.value = password;
-                        startWaitingForApproval({ username, email });
-                    } else {
-                        registerMsg.style.color = '#dc2626';
-                        registerMsg.textContent = res.message || 'สมัครสมาชิกไม่สำเร็จ';
-                    }
-                } catch (err) {
-                    registerMsg.style.color = '#dc2626';
-                    registerMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
-                }
-            });
+              const validUsernamePattern = /^[A-Za-z0-9._-]+$/;
+              if (!validUsernamePattern.test(username)) {
+                  registerMsg.style.color = '#dc2626';
+                  registerMsg.textContent = 'ชื่อผู้ใช้งานใส่ได้เฉพาะภาษาอังกฤษ ตัวเลข และอักขระพิเศษ ห้ามใส่ภาษาไทย';
+                  return;
+              }
+
+              try {
+                  const res = await DEIAuth.register({ fullName, username, email, password, role });
+                  if (res.success) {
+                      loginUsername.value = username;
+                      loginPassword.value = password;
+                      startWaitingForApproval({ username, email });
+                  } else {
+                      registerMsg.style.color = '#dc2626';
+                      registerMsg.textContent = res.message || 'สมัครสมาชิกไม่สำเร็จ';
+                  }
+              } catch (err) {
+                  registerMsg.style.color = '#dc2626';
+                  registerMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+              }
+          });
 
             document.getElementById('sendCodeBtn').addEventListener('click', async () => {
                 const emailVal = document.getElementById('forgotEmail').value.trim().toLowerCase();

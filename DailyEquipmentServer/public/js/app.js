@@ -25,6 +25,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         10: { min: 35.0, max: 55.0, name: 'กระแสไฟฟ้า' }
     };
 
+    // ดึงช่วงเกณฑ์มาตรฐานทั้งจากข้อพื้นฐาน และจากข้อความเช่น (8-12) หรือ placeholder
+    function resolveMeasurementRange(item, displaySeq) {
+        if (MEASUREMENT_RANGES[displaySeq]) {
+            return MEASUREMENT_RANGES[displaySeq];
+        }
+
+        const sources = [
+            String(item.placeholder || ''),
+            String(item.title || '')
+        ];
+
+        for (const text of sources) {
+            const match = text.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
+            if (match) {
+                const minVal = parseFloat(match[1]);
+                const maxVal = parseFloat(match[2]);
+                if (!isNaN(minVal) && !isNaN(maxVal)) {
+                    return { min: minVal, max: maxVal, name: item.title || '' };
+                }
+            }
+        }
+
+        return null;
+    }
+
     function normalizeCode(code) {
         return String(code || '').trim().toUpperCase();
     }
@@ -33,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return String(b || '').trim().toUpperCase().replace(/^อาคาร\s*/i, '');
     }
 
-    // แยกส่วนรหัส เช่น "A-M000" -> prefix: "A-M", num: 0 | "A-M013" -> prefix: "A-M", num: 13
     function parseMachineCodeParts(code) {
         const clean = normalizeCode(code);
         const match = clean.match(/^(.*?)(\d+)$/);
@@ -107,9 +131,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
     }
 
-    // อนุมัติแล้ว = ตัวอักษรสีเขียว ไม่มี [รออนุมัติ]
-    // รออนุมัติ = ต่อท้าย [รออนุมัติ]
-    // ยังไม่ตรวจ หรือ ไม่อนุมัติ = ตัวอักษรสีดำ ไม่มี [รออนุมัติ]
     function getOptionDisplay(m, todayInspections) {
         const targetCode = normalizeCode(m.code);
         const rec = todayInspections.find(i => normalizeCode(i.machineCode) === targetCode);
@@ -301,12 +322,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const displaySeq = index + 1;
             const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
             const needRemark = st.status === 'warning' || st.status === 'abnormal';
+            const range = resolveMeasurementRange(item, displaySeq);
 
             let placeholderText = item.placeholder || 'กรอกค่าตรวจวัด';
-            if (MEASUREMENT_RANGES[displaySeq] && !item.placeholder) {
-                const r = MEASUREMENT_RANGES[displaySeq];
-                placeholderText = `ปกติ ${r.min}-${r.max} ${item.unit}`;
+            if (range) {
+                placeholderText = `ปกติ ${range.min}-${range.max} ${item.unit || ''}`.trim();
             }
+
+            const minAttr = range ? `data-min="${range.min}"` : '';
+            const maxAttr = range ? `data-max="${range.max}"` : '';
 
             const row = document.createElement('div');
             row.className = 'checklist-item-row';
@@ -319,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="item-right-controls">
                         ${item.hasMeasurement ? `
                             <div class="measurement-box" title="ตัวอย่างค่า: ${placeholderText}">
-                                <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" placeholder="${placeholderText}" value="${st.measurementValue}" ${isLockedBySubmission ? 'disabled' : ''}>
+                                <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" ${minAttr} ${maxAttr} placeholder="${placeholderText}" value="${st.measurementValue}" ${isLockedBySubmission ? 'disabled' : ''}>
                                 <span class="measurement-unit">${item.unit}</span>
                             </div>
                         ` : ''}
@@ -375,23 +399,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             input.addEventListener('input', () => {
                 if (isLockedBySubmission) return;
                 const id = Number(input.dataset.itemId);
-                const seq = Number(input.dataset.seq);
                 const val = input.value;
                 if (!checklistState[id]) checklistState[id] = {};
                 checklistState[id].measurementValue = val;
 
-                if (val !== '' && MEASUREMENT_RANGES[seq]) {
-                    const num = parseFloat(val);
-                    const range = MEASUREMENT_RANGES[seq];
+                const hasMin = input.dataset.min !== undefined && input.dataset.min !== '';
+                const hasMax = input.dataset.max !== undefined && input.dataset.max !== '';
 
-                    if (!isNaN(num)) {
+                if (val !== '' && hasMin && hasMax) {
+                    const num = parseFloat(val);
+                    const minVal = parseFloat(input.dataset.min);
+                    const maxVal = parseFloat(input.dataset.max);
+
+                    if (!isNaN(num) && !isNaN(minVal) && !isNaN(maxVal)) {
                         const row = input.closest('.checklist-item-row');
                         const normalBtn = row.querySelector('.status-btn[data-status="normal"]');
                         const abnormalBtn = row.querySelector('.status-btn[data-status="abnormal"]');
                         const box = document.getElementById(`remarkBox_${id}`);
                         const remarkInput = document.getElementById(`remarkInput_${id}`);
 
-                        if (num < range.min || num > range.max) {
+                        if (num < minVal || num > maxVal) {
                             checklistState[id].status = 'abnormal';
                             row.querySelectorAll('.status-btn').forEach(b => b.classList.remove('selected'));
                             if (abnormalBtn) abnormalBtn.classList.add('selected');
@@ -399,7 +426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             box.classList.remove('hidden');
                             remarkInput.classList.add('is-abnormal');
                             if (!checklistState[id].remark) {
-                                checklistState[id].remark = `ค่าเกินเกณฑ์มาตรฐาน (${range.min}-${range.max})`;
+                                checklistState[id].remark = `ค่าเกินเกณฑ์มาตรฐาน (${minVal}-${maxVal})`;
                                 remarkInput.value = checklistState[id].remark;
                             }
                         } else {

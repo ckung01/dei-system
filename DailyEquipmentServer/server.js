@@ -6,7 +6,6 @@ const app = express();
 
 app.use(express.json());
 app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
 
 const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
@@ -41,6 +40,13 @@ const BASE_15_QUESTIONS = [
     { seq: 14, title: 'ตรวจสอบความสะอาดและพื้นที่รอบเครื่องจักร', has_measurement: 0, unit: '', placeholder: '' },
     { seq: 15, title: 'ตรวจสอบอุปกรณ์ความปลอดภัยและปุ่มหยุดฉุกเฉิน (Emergency Stop)', has_measurement: 0, unit: '', placeholder: '' }
 ];
+
+// เข้าหน้าแรกสุดของเว็บ ให้เปิด login.html ก่อนเสมอ
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 async function sendVerificationEmail(toEmail, code, fullName) {
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {

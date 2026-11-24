@@ -13,22 +13,54 @@ function extractFirstName(fullName) {
     return clean.split(' ')[0];
 }
 
+function getCurrentPageName() {
+    const pathParts = String(window.location.pathname || '').split('/').filter(Boolean);
+    const lastPart = pathParts[pathParts.length - 1] || 'index.html';
+    return lastPart.split('?')[0].split('#')[0];
+}
+
+function isPublicAuthPage(pageName) {
+    return ['login.html', 'register.html', 'forgot-password.html', 'reset-password.html'].includes(pageName);
+}
+
+function hasStoredSessionUser() {
+    try {
+        const raw = sessionStorage.getItem(DEI_AUTH_KEY) || localStorage.getItem(DEI_AUTH_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// ซ่อนหน้าเว็บทันทีตั้งแต่เริ่มโหลดสคริปต์ หากเข้าหน้าภายในโดยยังไม่ได้ล็อกอิน
+(function guardBeforeRender() {
+    const pageName = getCurrentPageName();
+    if (!isPublicAuthPage(pageName)) {
+        const quickUser = hasStoredSessionUser();
+        if (!quickUser) {
+            if (document.documentElement) {
+                document.documentElement.style.display = 'none';
+            }
+            window.location.replace('login.html');
+        }
+    }
+})();
+
 const DEIAuth = {
     getUser() {
-        try {
-            const raw = sessionStorage.getItem(DEI_AUTH_KEY) || localStorage.getItem(DEI_AUTH_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-            return null;
-        }
+        return hasStoredSessionUser();
     },
 
     setUser(user, remember = true) {
         const str = JSON.stringify(user);
-        localStorage.setItem(DEI_AUTH_KEY, str);
         if (remember) {
-            sessionStorage.setItem(DEI_AUTH_KEY, str);
+            localStorage.setItem(DEI_AUTH_KEY, str);
+        } else {
+            localStorage.removeItem(DEI_AUTH_KEY);
         }
+        sessionStorage.setItem(DEI_AUTH_KEY, str);
     },
 
     setPrefillLogin(username, password) {
@@ -49,7 +81,10 @@ const DEIAuth = {
     logout() {
         localStorage.removeItem(DEI_AUTH_KEY);
         sessionStorage.removeItem(DEI_AUTH_KEY);
-        window.location.href = 'login.html';
+        if (document.documentElement) {
+            document.documentElement.style.display = 'none';
+        }
+        window.location.replace('login.html');
     },
 
     async login(username, password) {
@@ -111,22 +146,28 @@ const DEIAuth = {
 
     enforceAccess(allowedRoles = []) {
         const user = this.getUser();
-        const pathParts = window.location.pathname.split('/');
-        const currentPage = pathParts[pathParts.length - 1] || 'index.html';
+        const currentPage = getCurrentPageName();
 
         if (!user) {
-            window.location.href = 'login.html';
+            if (document.documentElement) {
+                document.documentElement.style.display = 'none';
+            }
+            window.location.replace('login.html');
             return null;
         }
 
         if (!this.canAccessPage(user.role, currentPage)) {
-            window.location.href = this.getHomePageByRole(user.role);
+            window.location.replace(this.getHomePageByRole(user.role));
             return null;
         }
 
         if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-            window.location.href = this.getHomePageByRole(user.role);
+            window.location.replace(this.getHomePageByRole(user.role));
             return null;
+        }
+
+        if (document.documentElement) {
+            document.documentElement.style.display = '';
         }
 
         this.applyRoleUI(user);
@@ -192,3 +233,10 @@ const DEIAuth = {
         });
     }
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+    const pageName = getCurrentPageName();
+    if (!isPublicAuthPage(pageName)) {
+        DEIAuth.enforceAccess();
+    }
+});

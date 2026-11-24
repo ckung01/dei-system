@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+
     <style>
         .auth-wrapper {
             max-width: 480px;
@@ -188,11 +189,11 @@
                     <input type="text" id="regFullName" class="form-control" placeholder="เช่น กิตติพงษ์ รุ่งเรือง" required>
                 </div>
                 <div class="form-group">
-                    <label for="regUsername">ชื่อผู้ใช้งาน (ตั้งเอง ห้ามซ้ำ) <span class="required">*</span></label>
+                    <label for="regUsername">ชื่อผู้ใช้งาน <span class="required">*</span></label>
                     <input type="text" id="regUsername" class="form-control" placeholder="ตั้งชื่อผู้ใช้งาน" required>
                 </div>
                 <div class="form-group">
-                    <label for="regEmail">อีเมล (1 อีเมลใช้ได้ 1 ยูสเซอร์) <span class="required">*</span></label>
+                    <label for="regEmail">อีเมล <span class="required">*</span></label>
                     <input type="email" id="regEmail" class="form-control" placeholder="เช่น name@example.com" required>
                 </div>
                 <div class="form-group">
@@ -202,9 +203,9 @@
                 <div class="form-group">
                     <label for="regRole">เลือกสิทธิ์ผู้ใช้งาน <span class="required">*</span></label>
                     <select id="regRole" class="form-control" required>
-                        <option value="inspector">1. ผู้ตรวจสอบ</option>
-                        <option value="approver">2. ผู้อนุมัติ</option>
-                        <option value="admin">3. ผู้ดูแลระบบ</option>
+                        <option value="inspector"> ผู้ตรวจสอบ</option>
+                        <option value="approver"> ผู้อนุมัติ</option>
+                        <option value="admin"> ผู้ดูแลระบบ</option>
                     </select>
                 </div>
                 <button type="submit" class="btn btn-success auth-submit-btn">สมัครสมาชิก</button>

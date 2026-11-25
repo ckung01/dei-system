@@ -21,7 +21,17 @@ db.connect(err => {
     console.log('Connected to MySQL Database successfully!');
 });
 
-const USERNAME_REGEX = /^[A-Za-z0-9._-]+$/;
+const USERNAME_REGEX = /^[A-Za-z0-9]+$/;
+const THAI_NAME_REGEX = /^[\u0E00-\u0E7F\s]+$/;
+
+function validatePasswordRule(password) {
+    const val = String(password || '');
+    if (/[\u0E00-\u0E7F\s]/.test(val)) return 'รหัสผ่านห้ามใส่ภาษาไทยหรือเว้นวรรค';
+    if (val.length < 8) return 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร';
+    if (!/[A-Za-z]/.test(val)) return 'รหัสผ่านต้องมีตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว';
+    if (!/[0-9]/.test(val)) return 'รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว';
+    return '';
+}
 
 const BASE_15_QUESTIONS = [
     { seq: 1, title: 'ตรวจสอบแรงดันด้านขาดูด (Suction Pressure)', has_measurement: 1, unit: 'bar', placeholder: '4-8' },
@@ -133,14 +143,35 @@ app.post('/api/auth/register', (req, res) => {
         return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
     }
 
+    const cleanFullName = fullName.trim();
     const cleanUsername = username.trim();
     const cleanEmail = email.trim().toLowerCase();
+
+    if (!THAI_NAME_REGEX.test(cleanFullName)) {
+        return res.status(400).json({
+            success: false,
+            message: 'ชื่อ-นามสกุลใส่ได้เฉพาะภาษาไทยเท่านั้น'
+        });
+    }
 
     if (!USERNAME_REGEX.test(cleanUsername)) {
         return res.status(400).json({
             success: false,
-            message: 'ชื่อผู้ใช้งานใส่ได้เฉพาะภาษาอังกฤษ ตัวเลข และอักขระพิเศษ ห้ามใส่ภาษาไทยหรือเว้นวรรค'
+            message: 'ชื่อผู้ใช้งานใส่ได้เฉพาะตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น'
         });
+    }
+
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json({
+            success: false,
+            message: 'อีเมลไม่ถูกต้อง'
+        });
+    }
+
+    const passErr = validatePasswordRule(password);
+    if (passErr) {
+        return res.status(400).json({ success: false, message: passErr });
     }
 
     db.query('SELECT id, username, email FROM users WHERE username = ? OR email = ?', [cleanUsername, cleanEmail], (err, rows) => {
@@ -161,7 +192,7 @@ app.post('/api/auth/register', (req, res) => {
             INSERT INTO users (username, email, password, full_name, role, approval_status)
             VALUES (?, ?, ?, ?, ?, 'pending')
         `;
-        db.query(sql, [cleanUsername, cleanEmail, password, fullName.trim(), safeRole], (insertErr, result) => {
+        db.query(sql, [cleanUsername, cleanEmail, password, cleanFullName, safeRole], (insertErr, result) => {
             if (insertErr) {
                 if (insertErr.code === 'ER_DUP_ENTRY') {
                     return res.status(409).json({ success: false, message: 'ยูสเซอร์หรืออีเมลนี้มีอยู่ในระบบแล้ว' });
@@ -174,7 +205,7 @@ app.post('/api/auth/register', (req, res) => {
                     id: result.insertId,
                     username: cleanUsername,
                     email: cleanEmail,
-                    fullName: fullName.trim(),
+                    fullName: cleanFullName,
                     role: safeRole,
                     approvalStatus: 'pending'
                 }
@@ -318,6 +349,11 @@ app.post('/api/auth/reset-password', (req, res) => {
     const { email, code, newPassword } = req.body;
     if (!email || !code || !newPassword) {
         return res.status(400).json({ success: false, message: 'กรุณากรอกอีเมล รหัสยืนยัน และรหัสผ่านใหม่ให้ครบ' });
+    }
+
+    const passErr = validatePasswordRule(newPassword);
+    if (passErr) {
+        return res.status(400).json({ success: false, message: passErr });
     }
 
     const cleanEmail = email.trim().toLowerCase();

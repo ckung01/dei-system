@@ -21,6 +21,9 @@ db.connect(err => {
     console.log('Connected to MySQL Database successfully!');
 });
 
+// เก็บรหัส OTP สำหรับสมัครสมาชิกชั่วคราวในหน่วยความจำ (email -> { code, expiresAt })
+const registerOtpStore = new Map();
+
 const USERNAME_REGEX = /^[A-Za-z0-9]+$/;
 
 const VALID_EMAIL_DOMAINS = new Set([
@@ -91,14 +94,14 @@ app.get('/', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-async function sendVerificationEmail(toEmail, code, fullName) {
+async function sendEmailWithNodemailer(toEmail, subject, textBody) {
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
         try {
             const nodemailer = require('nodemailer');
             const transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
-                port: Number(process.env.SMTP_PORT || 587),
-                secure: process.env.SMTP_SECURE === 'true',
+                port: Number(process.env.SMTP_PORT || 465),
+                secure: process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE === 'true' : Number(process.env.SMTP_PORT || 465) === 465,
                 auth: {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASS
@@ -107,15 +110,32 @@ async function sendVerificationEmail(toEmail, code, fullName) {
             await transporter.sendMail({
                 from: process.env.SMTP_FROM || process.env.SMTP_USER,
                 to: toEmail,
-                subject: 'รหัสยืนยันการรีเซ็ตรหัสผ่าน - ระบบตรวจเช็กเครื่องจักรประจำวัน',
-                text: `สวัสดีคุณ ${fullName || ''}\nรหัสยืนยันสำหรับรีเซ็ตรหัสผ่านของคุณคือ: ${code}\nรหัสนี้มีอายุ 15 นาที`
+                subject,
+                text: textBody
             });
             return { sentViaEmail: true };
         } catch (e) {
             console.error('Send email error:', e.message);
+            return { sentViaEmail: false, error: e.message };
         }
     }
     return { sentViaEmail: false };
+}
+
+async function sendVerificationEmail(toEmail, code, fullName) {
+    return await sendEmailWithNodemailer(
+        toEmail,
+        'รหัสยืนยันการรีเซ็ตรหัสผ่าน - ระบบตรวจเช็กเครื่องจักรประจำวัน',
+        `สวัสดีคุณ ${fullName || ''}\nรหัสยืนยันสำหรับรีเซ็ตรหัสผ่านของคุณคือ: ${code}\nรหัสนี้มีอายุ 15 นาที`
+    );
+}
+
+async function sendRegisterOtpEmail(toEmail, code, fullName) {
+    return await sendEmailWithNodemailer(
+        toEmail,
+        'รหัสยืนยันการสมัครสมาชิก - ระบบตรวจเช็กเครื่องจักรประจำวัน',
+        `สวัสดีคุณ ${fullName || ''}\nรหัสยืนยันการสมัครสมาชิกของคุณคือ: ${code}\nรหัสนี้มีอายุ 10 นาที`
+    );
 }
 
 function seedBase15QuestionsForMachine(machineCode, callback) {
@@ -166,19 +186,52 @@ function resequenceMachineQuestions(machineCode, callback) {
     });
 }
 
+// ส่งรหัส OTP 6 หลักไปยังอีเมลตอนสมัครสมาชิก
+app.post('/api/auth/send-register-code', (req, res) => {
+    const cleanEmail = String(req.body.email || '').trim().toLowerCase();
+    const cleanFullName = String(req.body.fullName || '').trim().replace(/\s+/g, ' ');
+
+    if (!cleanEmail || !isRealEmailDomain(cleanEmail)) {
+        return res.status(400).json({ success: false, message: 'อีเมลไม่ถูกต้อง' });
+    }
+
+    db.query('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1', [cleanEmail], async (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        if (rows.length > 0) {
+            return res.status(409).json({ success: false, message: 'อีเมลนี้ถูกใช้งานกับบัญชีอื่นแล้ว (1 อีเมลใช้ได้ 1 ยูสเซอร์)' });
+        }
+
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        registerOtpStore.set(cleanEmail, {
+            code,
+            expiresAt: Date.now() + 10 * 60 * 1000
+        });
+
+        const mailResult = await sendRegisterOtpEmail(cleanEmail, code, cleanFullName);
+        res.json({
+            success: true,
+            message: mailResult.sentViaEmail
+                ? `ส่งรหัสยืนยัน 6 หลักไปยังอีเมล ${cleanEmail} แล้ว (มีอายุ 10 นาที)`
+                : `สร้างรหัสยืนยัน 6 หลักสำหรับ ${cleanEmail} แล้ว`,
+            previewCode: mailResult.sentViaEmail ? undefined : code
+        });
+    });
+});
+
 // สมัครสมาชิก
 app.post('/api/auth/register', (req, res) => {
-    const { username, email, password, fullName, role } = req.body;
+    const { username, email, verifyCode, password, fullName, role } = req.body;
     const allowedRoles = ['inspector', 'approver', 'admin'];
     const safeRole = allowedRoles.includes(role) ? role : 'inspector';
 
-    if (!username || !email || !password || !fullName) {
+    if (!username || !email || !verifyCode || !password || !fullName) {
         return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
     }
 
     const cleanFullName = String(fullName || '').trim().replace(/\s+/g, ' ');
     const cleanUsername = username.trim();
     const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = String(verifyCode || '').trim();
 
     if (!hasFirstAndLastNameThai(cleanFullName)) {
         return res.status(400).json({
@@ -198,6 +251,21 @@ app.post('/api/auth/register', (req, res) => {
         return res.status(400).json({
             success: false,
             message: 'อีเมลไม่ถูกต้อง'
+        });
+    }
+
+    if (!/^[0-9]{6}$/.test(cleanCode)) {
+        return res.status(400).json({
+            success: false,
+            message: 'รหัสยืนยันต้องเป็นตัวเลข 6 หลักเท่านั้น'
+        });
+    }
+
+    const otpRecord = registerOtpStore.get(cleanEmail);
+    if (!otpRecord || Date.now() > otpRecord.expiresAt || otpRecord.code !== cleanCode) {
+        return res.status(400).json({
+            success: false,
+            message: 'รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว กรุณากดส่งรหัสยืนยันใหม่'
         });
     }
 
@@ -231,6 +299,9 @@ app.post('/api/auth/register', (req, res) => {
                 }
                 return res.status(500).json({ success: false, message: insertErr.message });
             }
+
+            registerOtpStore.delete(cleanEmail);
+
             res.json({
                 success: true,
                 user: {

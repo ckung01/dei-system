@@ -250,7 +250,7 @@
             <form id="loginForm" class="auth-form" novalidate>
                 <div class="form-group">
                     <label for="loginUsername">ชื่อผู้ใช้งาน (Username) <span class="required">*</span></label>
-                    <input type="text" id="loginUsername" class="form-control" placeholder="กรอกชื่อผู้ใช้งาน (ภาษาอังกฤษและตัวเลข)" required>
+                    <input type="text" id="loginUsername" class="form-control" placeholder="กรอกชื่อผู้ใช้งาน " required>
                     <div id="loginUsernameErr" class="field-error-text"></div>
                 </div>
                 <div class="form-group">
@@ -271,17 +271,17 @@
             <!-- 2. ฟอร์มสมัครสมาชิก -->
             <form id="registerForm" class="auth-form hidden" novalidate>
                 <div class="form-group">
-                    <label for="regFullName">ชื่อ-นามสกุล (ภาษาไทย เว้นวรรคระหว่างชื่อและนามสกุล) <span class="required">*</span></label>
+                    <label for="regFullName">ชื่อ-นามสกุล <span class="required">*</span></label>
                     <input type="text" id="regFullName" class="form-control" placeholder="เช่น กิตติพงษ์ รุ่งเรือง" required>
                     <div id="regFullNameErr" class="field-error-text"></div>
                 </div>
                 <div class="form-group">
-                    <label for="regUsername">ชื่อผู้ใช้งาน (ภาษาอังกฤษและตัวเลขเท่านั้น) <span class="required">*</span></label>
+                    <label for="regUsername">ชื่อผู้ใช้งาน <span class="required">*</span></label>
                     <input type="text" id="regUsername" class="form-control" placeholder="เช่น somchai01" required>
                     <div id="regUsernameErr" class="field-error-text"></div>
                 </div>
                 <div class="form-group">
-                    <label for="regEmail">อีเมล (1 อีเมลใช้ได้ 1 ยูสเซอร์) <span class="required">*</span></label>
+                    <label for="regEmail">อีเมล <span class="required">*</span></label>
                     <div class="email-verify-row">
                         <input type="email" id="regEmail" class="form-control" placeholder="เช่น name@gmail.com" required>
                         <button type="button" id="sendRegCodeBtn" class="btn btn-primary btn-send-otp">ส่งรหัสยืนยัน</button>
@@ -290,12 +290,12 @@
                     <div id="regOtpSentMsg" class="otp-status-note"></div>
                 </div>
                 <div class="form-group">
-                    <label for="regVerifyCode">รหัสยืนยัน (ตัวเลข 6 หลักที่ส่งไปยังอีเมล) <span class="required">*</span></label>
+                    <label for="regVerifyCode">รหัสOTP  <span class="required">*</span></label>
                     <input type="text" id="regVerifyCode" inputmode="numeric" maxlength="6" class="form-control" placeholder="กรอกรหัสยืนยันตัวเลข 6 หลัก" required>
                     <div id="regVerifyCodeErr" class="field-error-text"></div>
                 </div>
                 <div class="form-group">
-                    <label for="regPassword">ตั้งรหัสผ่าน (อย่างน้อย 8 ตัว มีตัวอังกฤษและตัวเลข) <span class="required">*</span></label>
+                    <label for="regPassword">ตั้งรหัสผ่าน <span class="required">*</span></label>
                     <div class="password-input-wrap">
                         <input type="password" id="regPassword" class="form-control" placeholder="ตั้งรหัสผ่านอย่างน้อย 8 ตัวอักษร" required>
                         <button type="button" class="toggle-eye-btn" data-target="regPassword" aria-label="แสดงหรือซ่อนรหัสผ่าน"></button>
@@ -313,9 +313,9 @@
                 <div class="form-group">
                     <label for="regRole">เลือกสิทธิ์ผู้ใช้งาน <span class="required">*</span></label>
                     <select id="regRole" class="form-control" required>
-                        <option value="inspector">1. ผู้ตรวจสอบ</option>
-                        <option value="approver">2. ผู้อนุมัติ</option>
-                        <option value="admin">3. ผู้ดูแลระบบ</option>
+                        <option value="inspector">ผู้ตรวจสอบ</option>
+                        <option value="approver">ผู้อนุมัติ</option>
+                        <option value="admin">ผู้ดูแลระบบ</option>
                     </select>
                 </div>
                 <button type="submit" id="registerSubmitBtn" class="btn btn-success auth-submit-btn" disabled>สมัครสมาชิก</button>

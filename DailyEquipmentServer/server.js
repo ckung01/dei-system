@@ -22,7 +22,38 @@ db.connect(err => {
 });
 
 const USERNAME_REGEX = /^[A-Za-z0-9]+$/;
-const THAI_NAME_REGEX = /^[\u0E00-\u0E7F\s]+$/;
+
+const VALID_EMAIL_DOMAINS = new Set([
+    'gmail.com', 'googlemail.com',
+    'hotmail.com', 'hotmail.co.th',
+    'outlook.com', 'outlook.co.th',
+    'live.com', 'windowslive.com',
+    'yahoo.com', 'yahoo.co.th', 'ymail.com',
+    'icloud.com', 'me.com', 'mac.com',
+    'msn.com', 'aol.com',
+    'proton.me', 'protonmail.com',
+    'gmx.com', 'zoho.com', 'mail.com'
+]);
+
+function isRealEmailDomain(emailVal) {
+    const clean = String(emailVal || '').trim().toLowerCase();
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(clean)) {
+        return false;
+    }
+    const parts = clean.split('@');
+    if (parts.length !== 2) return false;
+    const domain = parts[1];
+    if (VALID_EMAIL_DOMAINS.has(domain)) return true;
+    return /\.(ac\.th|co\.th|go\.th|or\.th|mi\.th|edu|gov|org|net|com)$/.test(domain) && domain.split('.').length >= 2 && domain.split('.').every(p => /^[a-z0-9-]{2,}$/.test(p) && !p.startsWith('-') && !p.endsWith('-'));
+}
+
+function hasFirstAndLastNameThai(fullNameVal) {
+    const clean = String(fullNameVal || '').trim().replace(/\s+/g, ' ');
+    if (!clean) return false;
+    const parts = clean.split(' ');
+    if (parts.length < 2) return false;
+    return parts.every(part => /^[\u0E00-\u0E7F]{2,}$/.test(part));
+}
 
 function validatePasswordRule(password) {
     const val = String(password || '');
@@ -143,14 +174,14 @@ app.post('/api/auth/register', (req, res) => {
         return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
     }
 
-    const cleanFullName = fullName.trim();
+    const cleanFullName = String(fullName || '').trim().replace(/\s+/g, ' ');
     const cleanUsername = username.trim();
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!THAI_NAME_REGEX.test(cleanFullName)) {
+    if (!hasFirstAndLastNameThai(cleanFullName)) {
         return res.status(400).json({
             success: false,
-            message: 'ชื่อ-นามสกุลใส่ได้เฉพาะภาษาไทยเท่านั้น'
+            message: 'กรุณากรอกทั้งชื่อและนามสกุลเป็นภาษาไทย (ต้องมีอย่างน้อย 2 คำ เว้นวรรคคั่น)'
         });
     }
 
@@ -161,8 +192,7 @@ app.post('/api/auth/register', (req, res) => {
         });
     }
 
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(cleanEmail)) {
+    if (!isRealEmailDomain(cleanEmail)) {
         return res.status(400).json({
             success: false,
             message: 'อีเมลไม่ถูกต้อง'

@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ];
 
         for (const text of sources) {
-            const match = text.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
+            const match = text.match(/(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)/);
             if (match) {
                 const minVal = parseFloat(match[1]);
                 const maxVal = parseFloat(match[2]);
@@ -48,6 +48,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         return null;
+    }
+
+    function sanitizeNumericValue(rawVal) {
+        let val = String(rawVal || '').replace(/[^0-9.-]/g, '');
+        if (val.indexOf('-') > 0) {
+            val = val.replace(/-/g, '');
+        }
+        const dotIndex = val.indexOf('.');
+        if (dotIndex !== -1) {
+            val = val.slice(0, dotIndex + 1) + val.slice(dotIndex + 1).replace(/\./g, '');
+        }
+        return val;
     }
 
     function normalizeCode(code) {
@@ -244,7 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         checklistState = {};
         itemsList.forEach(i => {
-            checklistState[i.id] = { status: '', measurementValue: '', remark: '' };
+            checklistState[i.id] = { status: '', measurementValue: '', remark: '', lastOutOfRangeAlert: '' };
         });
 
         document.getElementById('detailBuilding').textContent = `อาคาร ${normalizeBuilding(machine.building)}`;
@@ -283,7 +295,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         checklistState[target.id] = {
                             status: oldItem.status || '',
                             measurementValue: oldItem.measurementValue || '',
-                            remark: oldItem.remark || ''
+                            remark: oldItem.remark || '',
+                            lastOutOfRangeAlert: ''
                         };
                     }
                 });
@@ -320,11 +333,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         itemsList.forEach((item, index) => {
             const displaySeq = index + 1;
-            const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '' };
+            const st = checklistState[item.id] || { status: '', measurementValue: '', remark: '', lastOutOfRangeAlert: '' };
             const needRemark = st.status === 'warning' || st.status === 'abnormal';
             const range = resolveMeasurementRange(item, displaySeq);
 
-            let placeholderText = item.placeholder || 'กรอกค่าตรวจวัด';
+            let placeholderText = item.placeholder || 'กรอกตัวเลข';
             if (range) {
                 placeholderText = `ปกติ ${range.min}-${range.max} ${item.unit || ''}`.trim();
             }
@@ -342,8 +355,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <div class="item-right-controls">
                         ${item.hasMeasurement ? `
-                            <div class="measurement-box" title="ตัวอย่างค่า: ${placeholderText}">
-                                <input type="number" step="any" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" ${minAttr} ${maxAttr} placeholder="${placeholderText}" value="${st.measurementValue}" ${isLockedBySubmission ? 'disabled' : ''}>
+                            <div class="measurement-box" title="ช่วงมาตรฐาน: ${placeholderText}">
+                                <input type="text" inputmode="decimal" class="measurement-input" data-item-id="${item.id}" data-seq="${displaySeq}" ${minAttr} ${maxAttr} placeholder="${placeholderText}" value="${st.measurementValue}" ${isLockedBySubmission ? 'disabled' : ''}>
                                 <span class="measurement-unit">${item.unit}</span>
                             </div>
                         ` : ''}
@@ -389,6 +402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     box.classList.add('hidden');
                     checklistState[id].remark = '';
+                    checklistState[id].lastOutOfRangeAlert = '';
                     if (input) input.value = '';
                 }
                 updateProgress();
@@ -399,37 +413,71 @@ document.addEventListener('DOMContentLoaded', async () => {
             input.addEventListener('input', () => {
                 if (isLockedBySubmission) return;
                 const id = Number(input.dataset.itemId);
-                const val = input.value;
+                const seqNum = Number(input.dataset.seq || 0);
+                const cleanedVal = sanitizeNumericValue(input.value);
+                if (input.value !== cleanedVal) {
+                    input.value = cleanedVal;
+                }
+
                 if (!checklistState[id]) checklistState[id] = {};
-                checklistState[id].measurementValue = val;
+                checklistState[id].measurementValue = cleanedVal;
 
                 const hasMin = input.dataset.min !== undefined && input.dataset.min !== '';
                 const hasMax = input.dataset.max !== undefined && input.dataset.max !== '';
+                const num = parseFloat(cleanedVal);
 
-                if (val !== '' && hasMin && hasMax) {
-                    const num = parseFloat(val);
+                if (cleanedVal === '' || cleanedVal === '-' || isNaN(num)) {
+                    checklistState[id].lastOutOfRangeAlert = '';
+                    return;
+                }
+
+                if (hasMin && hasMax) {
                     const minVal = parseFloat(input.dataset.min);
                     const maxVal = parseFloat(input.dataset.max);
 
-                    if (!isNaN(num) && !isNaN(minVal) && !isNaN(maxVal)) {
+                    if (!isNaN(minVal) && !isNaN(maxVal)) {
                         const row = input.closest('.checklist-item-row');
                         const normalBtn = row.querySelector('.status-btn[data-status="normal"]');
                         const abnormalBtn = row.querySelector('.status-btn[data-status="abnormal"]');
                         const box = document.getElementById(`remarkBox_${id}`);
                         const remarkInput = document.getElementById(`remarkInput_${id}`);
 
-                        if (num < minVal || num > maxVal) {
+                        if (num < minVal) {
+                            const alertMsg = `ข้อที่ ${seqNum}: ค่าต่ำกว่ามาตรฐาน (ต่ำสุด ${minVal})`;
                             checklistState[id].status = 'abnormal';
                             row.querySelectorAll('.status-btn').forEach(b => b.classList.remove('selected'));
                             if (abnormalBtn) abnormalBtn.classList.add('selected');
 
                             box.classList.remove('hidden');
                             remarkInput.classList.add('is-abnormal');
-                            if (!checklistState[id].remark) {
-                                checklistState[id].remark = `ค่าเกินเกณฑ์มาตรฐาน (${minVal}-${maxVal})`;
+                            if (!checklistState[id].remark || checklistState[id].remark.startsWith('ค่าสูงกว่ามาตรฐาน') || checklistState[id].remark.startsWith('ค่าเกินเกณฑ์มาตรฐาน')) {
+                                checklistState[id].remark = `ค่าต่ำกว่ามาตรฐาน (${minVal}-${maxVal})`;
                                 remarkInput.value = checklistState[id].remark;
                             }
+
+                            if (checklistState[id].lastOutOfRangeAlert !== alertMsg) {
+                                checklistState[id].lastOutOfRangeAlert = alertMsg;
+                                showToast('ค่าต่ำกว่ามาตรฐาน', 'error');
+                            }
+                        } else if (num > maxVal) {
+                            const alertMsg = `ข้อที่ ${seqNum}: ค่าสูงกว่ามาตรฐาน (สูงสุด ${maxVal})`;
+                            checklistState[id].status = 'abnormal';
+                            row.querySelectorAll('.status-btn').forEach(b => b.classList.remove('selected'));
+                            if (abnormalBtn) abnormalBtn.classList.add('selected');
+
+                            box.classList.remove('hidden');
+                            remarkInput.classList.add('is-abnormal');
+                            if (!checklistState[id].remark || checklistState[id].remark.startsWith('ค่าต่ำกว่ามาตรฐาน') || checklistState[id].remark.startsWith('ค่าเกินเกณฑ์มาตรฐาน')) {
+                                checklistState[id].remark = `ค่าสูงกว่ามาตรฐาน (${minVal}-${maxVal})`;
+                                remarkInput.value = checklistState[id].remark;
+                            }
+
+                            if (checklistState[id].lastOutOfRangeAlert !== alertMsg) {
+                                checklistState[id].lastOutOfRangeAlert = alertMsg;
+                                showToast('ค่าสูงกว่ามาตรฐาน', 'error');
+                            }
                         } else {
+                            checklistState[id].lastOutOfRangeAlert = '';
                             if (checklistState[id].status === '' || checklistState[id].status === 'abnormal') {
                                 checklistState[id].status = 'normal';
                                 row.querySelectorAll('.status-btn').forEach(b => b.classList.remove('selected'));
@@ -470,7 +518,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetFormBtn.addEventListener('click', () => {
             if (!currentMachine || isLockedBySubmission) return;
             Object.keys(checklistState).forEach(id => {
-                checklistState[id] = { status: '', measurementValue: '', remark: '' };
+                checklistState[id] = { status: '', measurementValue: '', remark: '', lastOutOfRangeAlert: '' };
             });
             renderChecklist();
             updateProgress();

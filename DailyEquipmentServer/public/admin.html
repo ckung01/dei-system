@@ -33,6 +33,11 @@
             gap: 14px;
             margin-bottom: 14px;
         }
+        .min-max-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
         .admin-table {
             width: 100%;
             border-collapse: collapse;
@@ -255,7 +260,7 @@
                             <th style="width:70px;">ข้อที่</th>
                             <th>คำถาม</th>
                             <th style="width:110px;">หน่วย</th>
-                            <th style="width:120px;">ตัวอย่างค่า</th>
+                            <th style="width:120px;">ช่วงมาตรฐาน (Min-Max)</th>
                             <th style="width:160px;">จัดการ</th>
                         </tr>
                     </thead>
@@ -285,9 +290,15 @@
                         <label for="modalQUnitInput">หน่วยค่าตรวจวัด (ถ้ามี)</label>
                         <input type="text" id="modalQUnitInput" class="form-control" placeholder="เช่น bar, °C, V">
                     </div>
-                    <div class="form-group" style="margin-bottom:12px;">
-                        <label for="modalQPlaceholderInput">ตัวอย่างค่าที่กรอก (ถ้ามี เช่น 5-10 หรือ 8-12)</label>
-                        <input type="text" id="modalQPlaceholderInput" class="form-control" placeholder="8-12">
+                    <div class="min-max-grid" style="margin-bottom:12px;">
+                        <div class="form-group">
+                            <label for="modalQMinInput">ค่าต่ำสุด (Min) - ตัวเลขเท่านั้น</label>
+                            <input type="text" id="modalQMinInput" class="form-control numeric-only-input" inputmode="decimal" placeholder="เช่น 5">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalQMaxInput">ค่าสูงสุด (Max) - ตัวเลขเท่านั้น</label>
+                            <input type="text" id="modalQMaxInput" class="form-control numeric-only-input" inputmode="decimal" placeholder="เช่น 10">
+                        </div>
                     </div>
                     <div class="form-group checkbox-inline">
                         <input type="checkbox" id="modalQHasMeasurementInput">
@@ -328,10 +339,40 @@
             const modalEditingQuestionId = document.getElementById('modalEditingQuestionId');
             const modalQTitleInput = document.getElementById('modalQTitleInput');
             const modalQUnitInput = document.getElementById('modalQUnitInput');
-            const modalQPlaceholderInput = document.getElementById('modalQPlaceholderInput');
+            const modalQMinInput = document.getElementById('modalQMinInput');
+            const modalQMaxInput = document.getElementById('modalQMaxInput');
             const modalQHasMeasurementInput = document.getElementById('modalQHasMeasurementInput');
 
-            // เข้ามาหน้าจัดการระบบทุกครั้ง เลือก "อาคารทั้งหมด" ไว้เป็นพื้นฐานเสมอ
+            function sanitizeNumericInput(el) {
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    let val = el.value.replace(/[^0-9.-]/g, '');
+                    if (val.indexOf('-') > 0) {
+                        val = val.replace(/-/g, '');
+                    }
+                    const dotIndex = val.indexOf('.');
+                    if (dotIndex !== -1) {
+                        val = val.slice(0, dotIndex + 1) + val.slice(dotIndex + 1).replace(/\./g, '');
+                    }
+                    if (el.value !== val) {
+                        el.value = val;
+                    }
+                });
+            }
+
+            sanitizeNumericInput(modalQMinInput);
+            sanitizeNumericInput(modalQMaxInput);
+
+            function parseMinMaxFromPlaceholder(placeholderStr) {
+                const raw = String(placeholderStr || '').trim();
+                if (!raw) return { min: '', max: '' };
+                const parts = raw.split(/\s*-\s*/);
+                if (parts.length === 2) {
+                    return { min: parts[0].trim(), max: parts[1].trim() };
+                }
+                return { min: raw, max: '' };
+            }
+
             machineBuildingInput.value = 'ALL';
 
             const roleNameMap = {
@@ -527,12 +568,16 @@
                     modalEditingQuestionId.value = questionItem.id;
                     modalQTitleInput.value = questionItem.title || '';
                     modalQUnitInput.value = questionItem.unit || '';
-                    modalQPlaceholderInput.value = questionItem.placeholder || '';
+                    const parsedRange = parseMinMaxFromPlaceholder(questionItem.placeholder);
+                    modalQMinInput.value = parsedRange.min;
+                    modalQMaxInput.value = parsedRange.max;
                     modalQHasMeasurementInput.checked = Boolean(questionItem.hasMeasurement);
                 } else {
                     questionModalTitle.textContent = `เพิ่มคำถามใหม่เฉพาะเครื่อง ${code}`;
                     modalEditingQuestionId.value = '';
                     questionModalForm.reset();
+                    modalQMinInput.value = '';
+                    modalQMaxInput.value = '';
                 }
 
                 questionModal.classList.remove('hidden');
@@ -600,13 +645,39 @@
 
                 let rawTitle = modalQTitleInput.value.trim();
                 const unit = modalQUnitInput.value.trim();
-                const exampleVal = modalQPlaceholderInput.value.trim();
-                const hasMeasurement = modalQHasMeasurementInput.checked;
+                const minVal = modalQMinInput.value.trim();
+                const maxVal = modalQMaxInput.value.trim();
+                let hasMeasurement = modalQHasMeasurementInput.checked;
 
-                const rangeMatch = exampleVal.match(/^\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?$/);
-                if (rangeMatch) {
-                    const cleanRange = exampleVal.replace(/\s+/g, '');
-                    const suffix = `(${cleanRange})`;
+                const numRegex = /^-?\d+(?:\.\d+)?$/;
+                if (minVal && !numRegex.test(minVal)) {
+                    showToast('ค่า Min ต้องเป็นตัวเลขเท่านั้น', 'warning');
+                    return;
+                }
+                if (maxVal && !numRegex.test(maxVal)) {
+                    showToast('ค่า Max ต้องเป็นตัวเลขเท่านั้น', 'warning');
+                    return;
+                }
+
+                const numMin = minVal !== '' ? Number(minVal) : null;
+                const numMax = maxVal !== '' ? Number(maxVal) : null;
+                if (numMin !== null && numMax !== null && numMin > numMax) {
+                    showToast('ค่าต่ำสุด (Min) ต้องไม่มากกว่าค่าสูงสุด (Max)', 'warning');
+                    return;
+                }
+
+                let exampleVal = '';
+                if (minVal !== '' && maxVal !== '') {
+                    exampleVal = `${minVal}-${maxVal}`;
+                } else if (minVal !== '') {
+                    exampleVal = `${minVal}-`;
+                } else if (maxVal !== '') {
+                    exampleVal = `-${maxVal}`;
+                }
+
+                if (exampleVal) {
+                    hasMeasurement = true;
+                    const suffix = `(${exampleVal})`;
                     if (!rawTitle.includes(suffix)) {
                         rawTitle = `${rawTitle} ${suffix}`;
                     }

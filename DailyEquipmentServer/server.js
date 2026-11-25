@@ -109,6 +109,29 @@ app.get('/', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function sendEmailWithNodemailer(toEmail, subject, textBody) {
+    if (process.env.GMAIL_SCRIPT_URL) {
+        try {
+            const response = await fetch(process.env.GMAIL_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: toEmail,
+                    subject: subject,
+                    text: textBody
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                console.error('Gmail Script error:', data);
+                return { sentViaEmail: false, error: data.error || 'Gmail Script error' };
+            }
+            return { sentViaEmail: true };
+        } catch (e) {
+            console.error('Send email error:', e.message);
+            return { sentViaEmail: false, error: e.message };
+        }
+    }
+
     const senderEmail = process.env.SMTP_USER || 'Cakekungg20@gmail.com';
 
     if (process.env.BREVO_API_KEY) {

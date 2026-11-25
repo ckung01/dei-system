@@ -109,33 +109,66 @@ app.get('/', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function sendEmailWithNodemailer(toEmail, subject, textBody) {
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const senderEmail = process.env.SMTP_USER || 'Cakekungg20@gmail.com';
+
+    if (process.env.BREVO_API_KEY) {
         try {
-            const nodemailer = require('nodemailer');
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: Number(process.env.SMTP_PORT || 587),
-                secure: Number(process.env.SMTP_PORT || 587) === 465,
-                connectionTimeout: 10000,
-                greetingTimeout: 10000,
-                socketTimeout: 15000,
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS
-                }
+            const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'api-key': process.env.BREVO_API_KEY,
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sender: {
+                        name: 'ระบบตรวจเช็กเครื่องจักรประจำวัน',
+                        email: senderEmail
+                    },
+                    to: [{ email: toEmail }],
+                    subject,
+                    textContent: textBody
+                })
             });
-            await transporter.sendMail({
-                from: process.env.SMTP_FROM || process.env.SMTP_USER,
-                to: toEmail,
-                subject,
-                text: textBody
-            });
+            const data = await response.json();
+            if (!response.ok) {
+                console.error('Brevo API error:', data);
+                return { sentViaEmail: false, error: data.message || 'Brevo API error' };
+            }
             return { sentViaEmail: true };
         } catch (e) {
             console.error('Send email error:', e.message);
             return { sentViaEmail: false, error: e.message };
         }
     }
+
+    if (process.env.RESEND_API_KEY) {
+        try {
+            const response = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from: 'onboarding@resend.dev',
+                    to: [toEmail],
+                    subject,
+                    text: textBody
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                console.error('Resend API error:', data);
+                return { sentViaEmail: false, error: data.message || 'Resend API error' };
+            }
+            return { sentViaEmail: true };
+        } catch (e) {
+            console.error('Send email error:', e.message);
+            return { sentViaEmail: false, error: e.message };
+        }
+    }
+
     return { sentViaEmail: false };
 }
 

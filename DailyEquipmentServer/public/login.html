@@ -244,7 +244,7 @@
             <!-- 2. ฟอร์มสมัครสมาชิก -->
             <form id="registerForm" class="auth-form hidden" novalidate>
                 <div class="form-group">
-                    <label for="regFullName">ชื่อ-นามสกุล (ภาษาไทยเท่านั้น) <span class="required">*</span></label>
+                    <label for="regFullName">ชื่อ-นามสกุล (ภาษาไทย เว้นวรรคระหว่างชื่อและนามสกุล) <span class="required">*</span></label>
                     <input type="text" id="regFullName" class="form-control" placeholder="เช่น กิตติพงษ์ รุ่งเรือง" required>
                     <div id="regFullNameErr" class="field-error-text"></div>
                 </div>
@@ -255,7 +255,7 @@
                 </div>
                 <div class="form-group">
                     <label for="regEmail">อีเมล (1 อีเมลใช้ได้ 1 ยูสเซอร์) <span class="required">*</span></label>
-                    <input type="email" id="regEmail" class="form-control" placeholder="เช่น name@example.com" required>
+                    <input type="email" id="regEmail" class="form-control" placeholder="เช่น name@gmail.com" required>
                     <div id="regEmailErr" class="field-error-text"></div>
                 </div>
                 <div class="form-group">
@@ -358,6 +358,38 @@
                 return;
             }
 
+            const VALID_EMAIL_DOMAINS = new Set([
+                'gmail.com', 'googlemail.com',
+                'hotmail.com', 'hotmail.co.th',
+                'outlook.com', 'outlook.co.th',
+                'live.com', 'windowslive.com',
+                'yahoo.com', 'yahoo.co.th', 'ymail.com',
+                'icloud.com', 'me.com', 'mac.com',
+                'msn.com', 'aol.com',
+                'proton.me', 'protonmail.com',
+                'gmx.com', 'zoho.com', 'mail.com'
+            ]);
+
+            function isRealEmailDomain(emailVal) {
+                const clean = String(emailVal || '').trim().toLowerCase();
+                if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(clean)) {
+                    return false;
+                }
+                const parts = clean.split('@');
+                if (parts.length !== 2) return false;
+                const domain = parts[1];
+                if (VALID_EMAIL_DOMAINS.has(domain)) return true;
+                return /\.(ac\.th|co\.th|go\.th|or\.th|mi\.th|edu|gov|org|net|com)$/.test(domain) && domain.split('.').length >= 2 && domain.split('.').every(p => /^[a-z0-9-]{2,}$/.test(p) && !p.startsWith('-') && !p.endsWith('-'));
+            }
+
+            function hasFirstAndLastNameThai(fullNameVal) {
+                const clean = String(fullNameVal || '').trim().replace(/\s+/g, ' ');
+                if (!clean) return false;
+                const parts = clean.split(' ');
+                if (parts.length < 2) return false;
+                return parts.every(part => /^[\u0E00-\u0E7F]{2,}$/.test(part));
+            }
+
             const EYE_OPEN_SVG = `
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -433,18 +465,13 @@
                 }
             }
 
-            // เช็กความพร้อมของฟอร์มสมัครสมาชิกแบบเงียบ (ไม่เด้งแดงจนกว่าจะพิมพ์/ออกจากช่อง/กดส่ง)
             function checkRegisterAllValidSilently() {
-                const nameVal = regFullName.value.trim();
+                const nameOk = hasFirstAndLastNameThai(regFullName.value);
                 const userVal = regUsername.value.trim();
-                const emailVal = regEmail.value.trim();
+                const userOk = Boolean(userVal) && /^[A-Za-z0-9]+$/.test(userVal);
+                const emailOk = isRealEmailDomain(regEmail.value);
                 const passVal = regPassword.value;
                 const confirmVal = regConfirmPassword.value;
-                const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-
-                const nameOk = Boolean(nameVal) && /^[\u0E00-\u0E7F\s]+$/.test(nameVal);
-                const userOk = Boolean(userVal) && /^[A-Za-z0-9]+$/.test(userVal);
-                const emailOk = Boolean(emailVal) && emailRegex.test(emailVal);
                 const passOk = !/[\u0E00-\u0E7F\s]/.test(passVal)
                     && passVal.length >= 8
                     && /[A-Za-z]/.test(passVal)
@@ -459,7 +486,6 @@
                 return allOk;
             }
 
-            // กรองอักขระระหว่างพิมพ์
             function attachThaiOnlyFilter(inputEl, errEl) {
                 let isComposing = false;
                 inputEl.addEventListener('compositionstart', () => { isComposing = true; });
@@ -478,8 +504,8 @@
                     if (cleaned !== inputEl.value) {
                         inputEl.value = cleaned;
                         setFieldError(inputEl, errEl, 'ชื่อ-นามสกุลใส่ได้เฉพาะภาษาไทยเท่านั้น (ห้ามภาษาอังกฤษและตัวเลข)');
-                    } else if (errEl.textContent) {
-                        validateFullName();
+                    } else if (errEl.textContent && hasFirstAndLastNameThai(inputEl.value)) {
+                        setFieldError(inputEl, errEl, '');
                     }
                     checkRegisterAllValidSilently();
                 });
@@ -535,16 +561,15 @@
                 });
             }
 
-            // ฟังก์ชันตรวจสอบแต่ละช่องและเปลี่ยนกรอบสีแดง
             function validateFullName() {
                 const errEl = document.getElementById('regFullNameErr');
-                const val = regFullName.value.trim();
-                if (!val) {
-                    setFieldError(regFullName, errEl, 'กรุณากรอกชื่อ-นามสกุล (ภาษาไทยเท่านั้น)');
+                const raw = regFullName.value.trim().replace(/\s+/g, ' ');
+                if (!raw) {
+                    setFieldError(regFullName, errEl, 'กรุณากรอกชื่อและนามสกุล (ภาษาไทย เว้นวรรคคั่น)');
                     return false;
                 }
-                if (!/^[\u0E00-\u0E7F\s]+$/.test(val)) {
-                    setFieldError(regFullName, errEl, 'ชื่อ-นามสกุลใส่ได้เฉพาะภาษาไทยเท่านั้น');
+                if (!hasFirstAndLastNameThai(raw)) {
+                    setFieldError(regFullName, errEl, 'กรุณากรอกทั้งชื่อและนามสกุลเป็นภาษาไทย (ต้องมีอย่างน้อย 2 คำ เว้นวรรคคั่น)');
                     return false;
                 }
                 setFieldError(regFullName, errEl, '');
@@ -568,9 +593,7 @@
 
             function validateEmailField(inputEl, errId) {
                 const errEl = document.getElementById(errId);
-                const val = inputEl.value.trim();
-                const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-                if (!val || !emailRegex.test(val)) {
+                if (!isRealEmailDomain(inputEl.value)) {
                     setFieldError(inputEl, errEl, 'อีเมลไม่ถูกต้อง');
                     return false;
                 }
@@ -619,7 +642,6 @@
                 return true;
             }
 
-            // ผูกตัวกรองและ blur ให้กรอบเปลี่ยนจากเทาเป็นแดงเมื่อไม่ตรงเงื่อนไข
             attachAlphaNumOnlyFilter(loginUsername, document.getElementById('loginUsernameErr'), () => validateUsername(loginUsername, 'loginUsernameErr'));
             loginUsername.addEventListener('blur', () => validateUsername(loginUsername, 'loginUsernameErr'));
 
@@ -649,8 +671,8 @@
                 document.getElementById('regEmailErr'),
                 'อีเมลห้ามใส่ภาษาไทย',
                 () => {
-                    if (document.getElementById('regEmailErr').textContent) {
-                        validateEmailField(regEmail, 'regEmailErr');
+                    if (document.getElementById('regEmailErr').textContent && isRealEmailDomain(regEmail.value)) {
+                        setFieldError(regEmail, document.getElementById('regEmailErr'), '');
                     }
                 },
                 checkRegisterAllValidSilently
@@ -692,8 +714,8 @@
             });
 
             attachNoThaiFilter(forgotEmail, document.getElementById('forgotEmailErr'), 'อีเมลห้ามใส่ภาษาไทย', () => {
-                if (document.getElementById('forgotEmailErr').textContent) {
-                    validateEmailField(forgotEmail, 'forgotEmailErr');
+                if (document.getElementById('forgotEmailErr').textContent && isRealEmailDomain(forgotEmail.value)) {
+                    setFieldError(forgotEmail, document.getElementById('forgotEmailErr'), '');
                 }
             });
             forgotEmail.addEventListener('blur', () => validateEmailField(forgotEmail, 'forgotEmailErr'));
@@ -870,7 +892,7 @@
                 registerMsg.style.color = '#475569';
                 registerMsg.textContent = 'กำลังบันทึกข้อมูลสมัครสมาชิก...';
 
-                const fullName = regFullName.value.trim();
+                const fullName = regFullName.value.trim().replace(/\s+/g, ' ');
                 const username = regUsername.value.trim();
                 const email = regEmail.value.trim().toLowerCase();
                 const password = regPassword.value;

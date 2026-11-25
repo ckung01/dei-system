@@ -8,18 +8,31 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
+    port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'dei_system',
-    dateStrings: true
+    dateStrings: true,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000
 });
 
-db.connect(err => {
-    if (err) throw err;
+db.on('error', (err) => {
+    console.error('MySQL pool error (handled):', err.code || err.message);
+});
+
+db.getConnection((err, connection) => {
+    if (err) {
+        console.error('Initial MySQL connection error:', err.message);
+        return;
+    }
     console.log('Connected to MySQL Database successfully!');
+    connection.release();
 });
 
 // เก็บรหัส OTP สำหรับสมัครสมาชิกชั่วคราวในหน่วยความจำ (email -> { code, expiresAt })

@@ -100,6 +100,15 @@ const DEIAuth = {
         return data;
     },
 
+    async sendRegisterCode(email, fullName = '') {
+        const res = await fetch('/api/auth/send-register-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, fullName })
+        });
+        return await res.json();
+    },
+
     async register(payload) {
         const res = await fetch('/api/auth/register', {
             method: 'POST',

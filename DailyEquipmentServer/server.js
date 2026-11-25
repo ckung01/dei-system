@@ -44,7 +44,9 @@ function isRealEmailDomain(emailVal) {
     if (parts.length !== 2) return false;
     const domain = parts[1];
     if (VALID_EMAIL_DOMAINS.has(domain)) return true;
-    return /\.(ac\.th|co\.th|go\.th|or\.th|mi\.th|edu|gov|org|net|com)$/.test(domain) && domain.split('.').length >= 2 && domain.split('.').every(p => /^[a-z0-9-]{2,}$/.test(p) && !p.startsWith('-') && !p.endsWith('-'));
+    return /\.(ac\.th|co\.th|go\.th|or\.th|mi\.th|edu|gov)$/.test(domain)
+        && domain.split('.').length >= 2
+        && domain.split('.').every(p => /^[a-z0-9-]{2,}$/.test(p) && !p.startsWith('-') && !p.endsWith('-'));
 }
 
 function hasFirstAndLastNameThai(fullNameVal) {

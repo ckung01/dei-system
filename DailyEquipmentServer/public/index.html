@@ -3,20 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ตรวจเช็กประจำวัน - ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</title>
+    <title>เข้าสู่ระบบ / สมัครสมาชิก - ระบบตรวจเช็กเครื่องจักรและอุปกรณ์ประจำวัน</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
-        <script>
-(function () {
-    var hasUser = sessionStorage.getItem('dei_current_user') || localStorage.getItem('dei_current_user');
-    if (!hasUser) {
-        document.documentElement.style.display = 'none';
-        window.location.replace('login.html');
-    }
-})();
-</script>
+    <style>
+        .auth-wrapper {
+            max-width: 480px;
+            margin: 36px auto;
+            padding: 0 16px;
+        }
+        .auth-card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .auth-header h2 {
+            margin: 0 0 6px;
+            font-size: 1.35rem;
+            color: #0f172a;
+        }
+        .auth-header p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .auth-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .auth-tab-btn {
+            border: none;
+            background: transparent;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: 'Prompt', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            color: #475569;
+        }
+        .auth-tab-btn.active {
+            background: #ffffff;
+            color: #1d4ed8;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+        }
+        .auth-form .form-group {
+            margin-bottom: 14px;
+        }
+        .auth-card .form-control {
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+        .auth-card .form-control:focus {
+            border-color: #64748b;
+            box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
+            outline: none;
+        }
+        .auth-card .form-control.is-invalid {
+            border-color: #dc2626 !important;
+            background-color: #fef2f2 !important;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16) !important;
+        }
+        .email-verify-row {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+        .email-verify-row .form-control {
+            flex: 1;
+            min-width: 0;
+        }
+        .btn-send-otp {
+            white-space: nowrap;
+            padding: 0 14px;
+            font-size: 0.88rem;
+            border-radius: 8px;
+        }
+        .btn-send-otp:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .otp-status-note {
+            font-size: 0.82rem;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+        .otp-status-note:empty {
+            display: none;
+        }
+        .auth-submit-btn {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            font-size: 1rem;
+        }
+        .auth-submit-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            filter: grayscale(25%);
+        }
+        .forgot-link-wrap {
+            text-align: right;
+            margin-top: 6px;
+        }
+        .link-btn {
+            background: none;
+            border: none;
+            color: #1d4ed8;
+            font-family: 'Prompt', sans-serif;
+            font-size: 0.88rem;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+        }
+        .auth-msg {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            text-align: center;
+            min-height: 20px;
+            line-height: 1.5;
+        }
+        .field-error-text {
+            color: #dc2626;
+            font-size: 0.82rem;
+            margin-top: 5px;
+            line-height: 1.4;
+            min-height: 0;
+        }
+        .field-error-text:empty {
+            display: none;
+        }
+        .password-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .password-input-wrap .form-control {
+            padding-right: 42px;
+        }
+        .toggle-eye-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            color: #64748b;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle-eye-btn:hover {
+            color: #0f172a;
+        }
+        .code-hint-box {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            color: #1e40af;
+            font-size: 0.88rem;
+            text-align: center;
+        }
+        .waiting-approval-box {
+            text-align: center;
+            padding: 16px 8px;
+        }
+        .waiting-spinner {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #1d4ed8;
+            border-radius: 50%;
+            animation: spinWait 1s linear infinite;
+        }
+        @keyframes spinWait {
+            to { transform: rotate(360deg); }
+        }
+        .waiting-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        .waiting-sub {
+            font-size: 0.92rem;
+            color: #475569;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+        .waiting-timer {
+            font-size: 0.86rem;
+            color: #1d4ed8;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+    </style>
 </head>
 <body>
     <header class="main-header">
@@ -32,186 +231,919 @@
                     <p>Daily Equipment Inspection System</p>
                 </div>
             </div>
-            <div class="header-right">
-                <div class="current-date" id="headerCurrentDate">กำลังโหลดวันที่...</div>
-                <div class="user-role-badge">
-                    <span class="role-dot"></span> ผู้ใช้งานระบบ
-                </div>
-                <button type="button" class="btn-logout" onclick="showToast('ออกจากระบบเรียบร้อย', 'info')">ออกจากระบบ</button>
-            </div>
         </div>
     </header>
 
-    <nav class="main-nav">
-        <div class="container nav-list">
-            <a href="index.html" class="nav-item active">ตรวจเช็กประจำวัน</a>
-            <a href="approval.html" class="nav-item">รายการรออนุมัติ</a>
-            <a href="history.html" class="nav-item">ประวัติการตรวจสอบ</a>
-        </div>
-    </nav>
-
-    <main class="container main-container">
-        <!-- Dashboard Section -->
-        <section class="dashboard-section">
-            <div class="dashboard-grid-row1">
-                <div class="dash-card card-total-blue">
-                    <div class="dash-card-info">
-                        <span class="dash-label">รายการตรวจสอบทั้งหมด</span>
-                        <div class="dash-value" id="dashInspectedCount">0 / 24 <small>เครื่อง</small></div>
-                    </div>
-                    <div class="dash-card-icon-right bg-blue-icon">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-                    </div>
-                </div>
-
-                <div class="dash-card card-uninspected-gray">
-                    <div class="dash-card-info">
-                        <span class="dash-label">ยังไม่ได้ตรวจสอบ</span>
-                        <div class="dash-value" id="dashUninspectedCount">24 / 24 <small>เครื่อง</small></div>
-                    </div>
-                    <div class="dash-card-icon-right bg-gray-icon">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                    </div>
-                </div>
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header" id="authHeaderBox">
+                <h2 id="authTitle">เข้าสู่ระบบ</h2>
+                <p id="authSubtitle">กรอกชื่อผู้ใช้งานและรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
             </div>
 
-            <div class="dashboard-grid-row2">
-                <div class="dash-card card-normal-theme">
-                    <div class="dash-card-info">
-                        <span class="dash-label">รายการปกติ</span>
-                        <div class="dash-value text-green" id="dashNormalCount">0</div>
-                        <span class="dash-sub-label">Normal</span>
-                    </div>
-                    <div class="dash-card-icon-right circle-badge-green">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                    </div>
-                </div>
-
-                <div class="dash-card card-warning-theme">
-                    <div class="dash-card-info">
-                        <span class="dash-label">เฝ้าระวัง</span>
-                        <div class="dash-value text-orange" id="dashWarningCount">0</div>
-                        <span class="dash-sub-label">Warning</span>
-                    </div>
-                    <div class="dash-card-icon-right circle-badge-orange">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                    </div>
-                </div>
-
-                <div class="dash-card card-abnormal-theme">
-                    <div class="dash-card-info">
-                        <span class="dash-label">ผิดปกติ</span>
-                        <div class="dash-value text-red" id="dashAbnormalCount">0</div>
-                        <span class="dash-sub-label">Abnormal</span>
-                    </div>
-                    <div class="dash-card-icon-right circle-badge-red">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                    </div>
-                </div>
+            <div class="auth-tabs" id="authTabsBox">
+                <button type="button" class="auth-tab-btn active" id="tabLoginBtn">เข้าสู่ระบบ</button>
+                <button type="button" class="auth-tab-btn" id="tabRegisterBtn">สมัครสมาชิก</button>
             </div>
-        </section>
 
-        <!-- ส่วนเลือกเครื่องจักร -->
-        <section class="card-box filter-section">
-            <h3 class="box-title">เลือกเครื่องจักรที่ต้องการตรวจสอบ</h3>
-            <div class="selector-grid">
+            <!-- 1. ฟอร์มเข้าสู่ระบบ -->
+            <form id="loginForm" class="auth-form" novalidate>
                 <div class="form-group">
-                    <label for="buildingSelect">1. เลือกอาคาร <span class="required">*</span></label>
-                    <select id="buildingSelect" class="form-control">
-                        <option value="">-- กรุณาเลือกอาคาร --</option>
-                        <option value="A">อาคาร A </option>
-                        <option value="B">อาคาร B </option>
+                    <label for="loginUsername">ชื่อผู้ใช้งาน (Username) <span class="required">*</span></label>
+                    <input type="text" id="loginUsername" class="form-control" placeholder="กรอกชื่อผู้ใช้งาน " required>
+                    <div id="loginUsernameErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">รหัสผ่าน (Password) <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="loginPassword" class="form-control" placeholder="กรอกรหัสผ่าน" required>
+                        <button type="button" class="toggle-eye-btn" data-target="loginPassword" aria-label="แสดงหรือซ่อนรหัสผ่าน"></button>
+                    </div>
+                    <div id="loginPasswordErr" class="field-error-text"></div>
+                    <div class="forgot-link-wrap">
+                        <button type="button" class="link-btn" id="goForgotBtn">ลืมรหัสผ่าน?</button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary auth-submit-btn">เข้าสู่ระบบ</button>
+                <div id="loginMsg" class="auth-msg"></div>
+            </form>
+
+            <!-- 2. ฟอร์มสมัครสมาชิก -->
+            <form id="registerForm" class="auth-form hidden" novalidate>
+                <div class="form-group">
+                    <label for="regFullName">ชื่อ-นามสกุล <span class="required">*</span></label>
+                    <input type="text" id="regFullName" class="form-control" placeholder="เช่น กิตติพงษ์ รุ่งเรือง" required>
+                    <div id="regFullNameErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="regUsername">ชื่อผู้ใช้งาน <span class="required">*</span></label>
+                    <input type="text" id="regUsername" class="form-control" placeholder="เช่น somchai01" required>
+                    <div id="regUsernameErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="regEmail">อีเมล <span class="required">*</span></label>
+                    <div class="email-verify-row">
+                        <input type="email" id="regEmail" class="form-control" placeholder="เช่น name@gmail.com" required>
+                        <button type="button" id="sendRegCodeBtn" class="btn btn-primary btn-send-otp">ส่งรหัสยืนยัน</button>
+                    </div>
+                    <div id="regEmailErr" class="field-error-text"></div>
+                    <div id="regOtpSentMsg" class="otp-status-note"></div>
+                </div>
+                <div class="form-group">
+                    <label for="regVerifyCode">รหัสOTP  <span class="required">*</span></label>
+                    <input type="text" id="regVerifyCode" inputmode="numeric" maxlength="6" class="form-control" placeholder="กรอกรหัสยืนยันตัวเลข 6 หลัก" required>
+                    <div id="regVerifyCodeErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">ตั้งรหัสผ่าน <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="regPassword" class="form-control" placeholder="ตั้งรหัสผ่านอย่างน้อย 8 ตัวอักษร" required>
+                        <button type="button" class="toggle-eye-btn" data-target="regPassword" aria-label="แสดงหรือซ่อนรหัสผ่าน"></button>
+                    </div>
+                    <div id="regPasswordErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="regConfirmPassword">ยืนยันรหัสผ่าน <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="regConfirmPassword" class="form-control" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง" required>
+                        <button type="button" class="toggle-eye-btn" data-target="regConfirmPassword" aria-label="แสดงหรือซ่อนรหัสผ่าน"></button>
+                    </div>
+                    <div id="regConfirmPasswordErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="regRole">เลือกสิทธิ์ผู้ใช้งาน <span class="required">*</span></label>
+                    <select id="regRole" class="form-control" required>
+                        <option value="inspector">ผู้ตรวจสอบ</option>
+                        <option value="approver">ผู้อนุมัติ</option>
+                        <option value="admin">ผู้ดูแลระบบ</option>
                     </select>
                 </div>
+                <button type="submit" id="registerSubmitBtn" class="btn btn-success auth-submit-btn" disabled>สมัครสมาชิก</button>
+                <div id="registerMsg" class="auth-msg"></div>
+            </form>
 
-                <div class="form-group">
-                    <label for="machineSelect">2. เลือกเครื่องจักร <span class="required">*</span></label>
-                    <select id="machineSelect" class="form-control" disabled>
-                        <option value="">-- กรุณาเลือกอาคารก่อน --</option>
-                    </select>
+            <!-- 2.1 หน้าโหลดรออนุมัติประมาณ 1-2 นาที หลังสมัครสมาชิกเสร็จ -->
+            <div id="waitingApprovalView" class="waiting-approval-box hidden">
+                <div class="waiting-spinner"></div>
+                <div class="waiting-title">สมัครสมาชิกเรียบร้อยแล้ว</div>
+                <div class="waiting-sub">
+                    รอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที<br>
+                    เมื่อผู้ดูแลระบบกดอนุมัติแล้ว ระบบจะพาเข้าใช้งานอัตโนมัติครับ
                 </div>
+                <div class="waiting-timer" id="waitingElapsedText">กำลังรอการอนุมัติ... (0:00)</div>
+                <button type="button" class="link-btn" id="backToLoginFromWaitingBtn">กลับไปหน้าเข้าสู่ระบบ</button>
+            </div>
 
-                <div class="form-group btn-align-bottom">
-                    <button type="button" id="searchMachineBtn" class="btn btn-primary btn-search">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                        ค้นหา
+            <!-- 3. หน้าลืมรหัสผ่าน -->
+            <form id="forgotForm" class="auth-form hidden" novalidate>
+                <div class="form-group">
+                    <label for="forgotEmail">อีเมลที่ใช้สมัครสมาชิก <span class="required">*</span></label>
+                    <input type="email" id="forgotEmail" class="form-control" placeholder="กรอกอีเมลของคุณ" required>
+                    <div id="forgotEmailErr" class="field-error-text"></div>
+                    <button type="button" id="sendCodeBtn" class="btn btn-primary auth-submit-btn" style="margin-top:10px;">
+                        ส่งรหัสยืนยันไปที่อีเมล
                     </button>
                 </div>
-            </div>
-        </section>
+                <div id="sendCodeMsg" class="auth-msg"></div>
+                <div id="codePreviewBox" class="code-hint-box hidden"></div>
 
-        <div id="emptyStateGuide" class="empty-guide-box">
-            <svg viewBox="0 0 24 24" width="48" height="48" fill="#94a3b8"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-            <h4>กรุณาเลือกอาคารและเครื่องจักร แล้วกดปุ่ม "ค้นหา"</h4>
-            <p>ระบบจะแสดงรายละเอียดเครื่องจักรและรายการตรวจเช็กประจำวันทั้ง 15 ข้อ</p>
+                <div class="form-group" style="margin-top:14px;">
+                    <label for="verifyCodeInput">รหัสยืนยันที่ส่งไปทางอีเมล <span class="required">*</span></label>
+                    <input type="text" id="verifyCodeInput" inputmode="numeric" class="form-control" placeholder="กรอกรหัสยืนยัน 6 หลัก" maxlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-success auth-submit-btn">ถัดไป</button>
+                <div style="text-align:center;margin-top:12px;">
+                    <button type="button" class="link-btn" id="backToLoginFromForgotBtn">กลับไปหน้าเข้าสู่ระบบ</button>
+                </div>
+                <div id="forgotErrorMsg" class="auth-msg"></div>
+            </form>
+
+            <!-- 4. หน้าตั้งรหัสผ่านใหม่ -->
+            <form id="resetPasswordForm" class="auth-form hidden" novalidate>
+                <div class="form-group">
+                    <label for="newPasswordInput">รหัสผ่านใหม่ <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="newPasswordInput" class="form-control" placeholder="กรอกรหัสผ่านใหม่อย่างน้อย 8 ตัวอักษร" required>
+                        <button type="button" class="toggle-eye-btn" data-target="newPasswordInput" aria-label="แสดงหรือซ่อนรหัสผ่าน"></button>
+                    </div>
+                    <div id="newPasswordErr" class="field-error-text"></div>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPasswordInput">ยืนยันรหัสผ่านใหม่ <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="confirmPasswordInput" class="form-control" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง" required>
+                        <button type="button" class="toggle-eye-btn" data-target="confirmPasswordInput" aria-label="แสดงหรือซ่อนรหัสผ่าน"></button>
+                    </div>
+                    <div id="confirmPasswordErr" class="field-error-text"></div>
+                </div>
+                <button type="submit" class="btn btn-success auth-submit-btn">ยืนยันรหัสผ่านใหม่</button>
+                <div id="resetPasswordMsg" class="auth-msg"></div>
+            </form>
         </div>
-
-        <form id="inspectionFormContainer" class="hidden" novalidate>
-            <div id="duplicateWarningBanner" class="alert-banner alert-warning hidden">
-                <div class="alert-banner-content">
-                    <strong>แจ้งเตือน: เครื่องจักรนี้ได้รับการตรวจสอบในวันนี้แล้ว</strong>
-                    <p id="duplicateWarningText">คุณกำลังดูข้อมูลผลตรวจเดิมของวันนี้ สามารถแก้ไขข้อมูลและกดบันทึกอัปเดตได้</p>
-                </div>
-            </div>
-
-            <section class="card-box machine-detail-card">
-                <div class="detail-header">
-                    <h3 class="box-title">รายละเอียดเครื่องจักรและผู้ตรวจสอบ</h3>
-                    <span class="badge-status-today" id="machineTodayStatusBadge">ยังไม่ตรวจวันนี้</span>
-                </div>
-                <div class="machine-info-grid">
-                    <div class="info-item">
-                        <span class="info-label">อาคาร</span>
-                        <span class="info-value" id="detailBuilding">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">รหัสเครื่องจักร</span>
-                        <span class="info-value text-blue" id="detailMachineCode">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">ชื่อเครื่องจักร</span>
-                        <span class="info-value" id="detailMachineName">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">วันที่ตรวจสอบ</span>
-                        <span class="info-value" id="detailInspectDate">-</span>
-                    </div>
-                </div>
-
-                <div class="inspector-input-row">
-                    <div class="form-group">
-                        <label for="inspectorNameInput">ชื่อช่างผู้ตรวจสอบ <span class="required">*</span></label>
-                        <input type="text" id="inspectorNameInput" class="form-control" placeholder="ระบุชื่อ-นามสกุล ช่างผู้ตรวจสอบ" required>
-                    </div>
-                </div>
-            </section>
-
-            <div class="checklist-header-bar">
-                <h3>รายการตรวจเช็กเครื่องจักรประจำวัน (15 รายการ)</h3>
-                <div class="checklist-progress-pill">
-                    เลือกสถานะแล้ว: <strong id="checkedCountText">0</strong> / 15 ข้อ
-                </div>
-            </div>
-
-            <div id="checklistCategoriesContainer" class="categories-wrapper"></div>
-
-            <div class="form-submit-bar">
-                <button type="button" id="resetFormBtn" class="btn btn-secondary">ล้างค่าที่เลือก</button>
-                <button type="submit" id="saveInspectionBtn" class="btn btn-success btn-lg">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-                    บันทึกผลการตรวจสอบ
-                </button>
-            </div>
-        </form>
-    </main>
+    </div>
 
     <div id="toastContainer" class="toast-container"></div>
 
     <script src="js/auth.js"></script>
-    <script src="js/data.js"></script>
-    <script src="js/app.js"></script>
     <script>
-  DEIAuth.enforceAccess(['inspector', 'approver', 'admin']);
+        (function () {
+            const prefill = DEIAuth.consumePrefillLogin();
+            const existingUser = DEIAuth.getUser();
+            if (existingUser && !prefill) {
+                window.location.replace(DEIAuth.getHomePageByRole(existingUser.role));
+                return;
+            }
+
+            const VALID_EMAIL_DOMAINS = new Set([
+                'gmail.com', 'googlemail.com',
+                'hotmail.com', 'hotmail.co.th',
+                'outlook.com', 'outlook.co.th',
+                'live.com', 'windowslive.com',
+                'yahoo.com', 'yahoo.co.th', 'ymail.com',
+                'icloud.com', 'me.com', 'mac.com',
+                'msn.com', 'aol.com',
+                'proton.me', 'protonmail.com',
+                'gmx.com', 'zoho.com', 'mail.com'
+            ]);
+
+            function isRealEmailDomain(emailVal) {
+                const clean = String(emailVal || '').trim().toLowerCase();
+                if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(clean)) {
+                    return false;
+                }
+                const parts = clean.split('@');
+                if (parts.length !== 2) return false;
+                const domain = parts[1];
+                if (VALID_EMAIL_DOMAINS.has(domain)) return true;
+                return /\.(ac\.th|co\.th|go\.th|or\.th|mi\.th|edu|gov)$/.test(domain)
+                    && domain.split('.').length >= 2
+                    && domain.split('.').every(p => /^[a-z0-9-]{2,}$/.test(p) && !p.startsWith('-') && !p.endsWith('-'));
+            }
+
+            function hasFirstAndLastNameThai(fullNameVal) {
+                const clean = String(fullNameVal || '').trim().replace(/\s+/g, ' ');
+                if (!clean) return false;
+                const parts = clean.split(' ');
+                if (parts.length < 2) return false;
+                return parts.every(part => /^[\u0E00-\u0E7F]{2,}$/.test(part));
+            }
+
+            const EYE_OPEN_SVG = `
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>`;
+            const EYE_CLOSED_SVG = `
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>`;
+
+            document.querySelectorAll('.toggle-eye-btn').forEach(btn => {
+                btn.innerHTML = EYE_OPEN_SVG;
+                btn.addEventListener('click', () => {
+                    const targetId = btn.getAttribute('data-target');
+                    const inputEl = document.getElementById(targetId);
+                    if (!inputEl) return;
+                    const isHidden = inputEl.type === 'password';
+                    inputEl.type = isHidden ? 'text' : 'password';
+                    btn.innerHTML = isHidden ? EYE_CLOSED_SVG : EYE_OPEN_SVG;
+                });
+            });
+
+            const authTitle = document.getElementById('authTitle');
+            const authSubtitle = document.getElementById('authSubtitle');
+            const authTabsBox = document.getElementById('authTabsBox');
+            const tabLoginBtn = document.getElementById('tabLoginBtn');
+            const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const registerSubmitBtn = document.getElementById('registerSubmitBtn');
+            const waitingApprovalView = document.getElementById('waitingApprovalView');
+            const waitingElapsedText = document.getElementById('waitingElapsedText');
+            const forgotForm = document.getElementById('forgotForm');
+            const resetPasswordForm = document.getElementById('resetPasswordForm');
+
+            const loginUsername = document.getElementById('loginUsername');
+            const loginPassword = document.getElementById('loginPassword');
+            const loginMsg = document.getElementById('loginMsg');
+
+            const regFullName = document.getElementById('regFullName');
+            const regUsername = document.getElementById('regUsername');
+            const regEmail = document.getElementById('regEmail');
+            const sendRegCodeBtn = document.getElementById('sendRegCodeBtn');
+            const regOtpSentMsg = document.getElementById('regOtpSentMsg');
+            const regVerifyCode = document.getElementById('regVerifyCode');
+            const regPassword = document.getElementById('regPassword');
+            const regConfirmPassword = document.getElementById('regConfirmPassword');
+            const registerMsg = document.getElementById('registerMsg');
+
+            const forgotEmail = document.getElementById('forgotEmail');
+            const sendCodeMsg = document.getElementById('sendCodeMsg');
+            const codePreviewBox = document.getElementById('codePreviewBox');
+            const forgotErrorMsg = document.getElementById('forgotErrorMsg');
+
+            const newPasswordInput = document.getElementById('newPasswordInput');
+            const confirmPasswordInput = document.getElementById('confirmPasswordInput');
+            const resetPasswordMsg = document.getElementById('resetPasswordMsg');
+
+            let verifiedEmail = '';
+            let verifiedCode = '';
+            let approvalPollTimer = null;
+            let approvalElapsedTimer = null;
+            let regOtpCooldownTimer = null;
+
+            function setFieldError(inputEl, errEl, message) {
+                if (!errEl) return;
+                errEl.innerHTML = message || '';
+                if (inputEl) {
+                    if (message) {
+                        inputEl.classList.add('is-invalid');
+                    } else {
+                        inputEl.classList.remove('is-invalid');
+                    }
+                }
+            }
+
+            function checkRegisterAllValidSilently() {
+                const nameOk = hasFirstAndLastNameThai(regFullName.value);
+                const userVal = regUsername.value.trim();
+                const userOk = Boolean(userVal) && /^[A-Za-z0-9]+$/.test(userVal);
+                const emailOk = isRealEmailDomain(regEmail.value);
+                const codeOk = /^[0-9]{6}$/.test(regVerifyCode.value.trim());
+                const passVal = regPassword.value;
+                const confirmVal = regConfirmPassword.value;
+                const passOk = !/[\u0E00-\u0E7F\s]/.test(passVal)
+                    && passVal.length >= 8
+                    && /[A-Za-z]/.test(passVal)
+                    && /[0-9]/.test(passVal);
+                const confirmOk = Boolean(confirmVal) && confirmVal === passVal;
+
+                const allOk = nameOk && userOk && emailOk && codeOk && passOk && confirmOk;
+                registerSubmitBtn.disabled = !allOk;
+                if (allOk && registerMsg.textContent.includes('กรุณาแก้ไข')) {
+                    registerMsg.textContent = '';
+                }
+                return allOk;
+            }
+
+            function attachThaiOnlyFilter(inputEl, errEl) {
+                let isComposing = false;
+                inputEl.addEventListener('compositionstart', () => { isComposing = true; });
+                inputEl.addEventListener('compositionend', () => {
+                    isComposing = false;
+                    const cleaned = inputEl.value.replace(/[^\u0E00-\u0E7F\s]/g, '');
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, 'ชื่อ-นามสกุลใส่ได้เฉพาะภาษาไทยเท่านั้น (ห้ามภาษาอังกฤษและตัวเลข)');
+                    }
+                    checkRegisterAllValidSilently();
+                });
+                inputEl.addEventListener('input', () => {
+                    if (isComposing) return;
+                    const cleaned = inputEl.value.replace(/[^\u0E00-\u0E7F\s]/g, '');
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, 'ชื่อ-นามสกุลใส่ได้เฉพาะภาษาไทยเท่านั้น (ห้ามภาษาอังกฤษและตัวเลข)');
+                    } else if (errEl.textContent && hasFirstAndLastNameThai(inputEl.value)) {
+                        setFieldError(inputEl, errEl, '');
+                    }
+                    checkRegisterAllValidSilently();
+                });
+            }
+
+            function attachAlphaNumOnlyFilter(inputEl, errEl, validateFn, onAfterCheck) {
+                let isComposing = false;
+                inputEl.addEventListener('compositionstart', () => { isComposing = true; });
+                inputEl.addEventListener('compositionend', () => {
+                    isComposing = false;
+                    const cleaned = inputEl.value.replace(/[^A-Za-z0-9]/g, '');
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, 'ชื่อผู้ใช้งานใส่ได้เฉพาะตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น');
+                    }
+                    if (onAfterCheck) onAfterCheck();
+                });
+                inputEl.addEventListener('input', () => {
+                    if (isComposing) return;
+                    const cleaned = inputEl.value.replace(/[^A-Za-z0-9]/g, '');
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, 'ชื่อผู้ใช้งานใส่ได้เฉพาะตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น');
+                    } else if (validateFn) {
+                        validateFn();
+                    }
+                    if (onAfterCheck) onAfterCheck();
+                });
+            }
+
+            function attachDigitsOnlyFilter(inputEl, errEl, validateFn, onAfterCheck) {
+                let isComposing = false;
+                inputEl.addEventListener('compositionstart', () => { isComposing = true; });
+                inputEl.addEventListener('compositionend', () => {
+                    isComposing = false;
+                    const cleaned = inputEl.value.replace(/[^0-9]/g, '').slice(0, 6);
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, 'รหัสยืนยันใส่ได้เฉพาะตัวเลข 0-9 เท่านั้น');
+                    }
+                    if (onAfterCheck) onAfterCheck();
+                });
+                inputEl.addEventListener('input', () => {
+                    if (isComposing) return;
+                    const cleaned = inputEl.value.replace(/[^0-9]/g, '').slice(0, 6);
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, 'รหัสยืนยันใส่ได้เฉพาะตัวเลข 0-9 เท่านั้น');
+                    } else if (validateFn && cleaned.length === 6) {
+                        validateFn();
+                    }
+                    if (onAfterCheck) onAfterCheck();
+                });
+            }
+
+            function attachNoThaiFilter(inputEl, errEl, disallowMsg, validateFn, onAfterCheck) {
+                let isComposing = false;
+                inputEl.addEventListener('compositionstart', () => { isComposing = true; });
+                inputEl.addEventListener('compositionend', () => {
+                    isComposing = false;
+                    const cleaned = inputEl.value.replace(/[\u0E00-\u0E7F\s]/g, '');
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, disallowMsg);
+                    }
+                    if (onAfterCheck) onAfterCheck();
+                });
+                inputEl.addEventListener('input', () => {
+                    if (isComposing) return;
+                    const cleaned = inputEl.value.replace(/[\u0E00-\u0E7F\s]/g, '');
+                    if (cleaned !== inputEl.value) {
+                        inputEl.value = cleaned;
+                        setFieldError(inputEl, errEl, disallowMsg);
+                    } else if (validateFn) {
+                        validateFn();
+                    }
+                    if (onAfterCheck) onAfterCheck();
+                });
+            }
+
+            function validateFullName() {
+                const errEl = document.getElementById('regFullNameErr');
+                const raw = regFullName.value.trim().replace(/\s+/g, ' ');
+                if (!raw) {
+                    setFieldError(regFullName, errEl, 'กรุณากรอกชื่อและนามสกุล (ภาษาไทย เว้นวรรคคั่น)');
+                    return false;
+                }
+                if (!hasFirstAndLastNameThai(raw)) {
+                    setFieldError(regFullName, errEl, 'กรุณากรอกทั้งชื่อและนามสกุลเป็นภาษาไทย (ต้องมีอย่างน้อย 2 คำ เว้นวรรคคั่น)');
+                    return false;
+                }
+                setFieldError(regFullName, errEl, '');
+                return true;
+            }
+
+            function validateUsername(inputEl, errId) {
+                const errEl = document.getElementById(errId);
+                const val = inputEl.value.trim();
+                if (!val) {
+                    setFieldError(inputEl, errEl, 'กรุณากรอกชื่อผู้ใช้งาน (ภาษาอังกฤษและตัวเลขเท่านั้น)');
+                    return false;
+                }
+                if (!/^[A-Za-z0-9]+$/.test(val)) {
+                    setFieldError(inputEl, errEl, 'ชื่อผู้ใช้งานใส่ได้เฉพาะตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น');
+                    return false;
+                }
+                setFieldError(inputEl, errEl, '');
+                return true;
+            }
+
+            function validateEmailField(inputEl, errId) {
+                const errEl = document.getElementById(errId);
+                if (!isRealEmailDomain(inputEl.value)) {
+                    setFieldError(inputEl, errEl, 'อีเมลไม่ถูกต้อง');
+                    return false;
+                }
+                setFieldError(inputEl, errEl, '');
+                return true;
+            }
+
+            function validateRegisterVerifyCode() {
+                const errEl = document.getElementById('regVerifyCodeErr');
+                const val = regVerifyCode.value.trim();
+                if (!val) {
+                    setFieldError(regVerifyCode, errEl, 'กรุณากรอกรหัสยืนยัน 6 หลักที่ส่งไปทางอีเมล');
+                    return false;
+                }
+                if (!/^[0-9]{6}$/.test(val)) {
+                    setFieldError(regVerifyCode, errEl, 'รหัสยืนยันต้องเป็นตัวเลข 6 หลักเท่านั้น');
+                    return false;
+                }
+                setFieldError(regVerifyCode, errEl, '');
+                return true;
+            }
+
+            function validateStrongPassword(inputEl, errId) {
+                const errEl = document.getElementById(errId);
+                const val = inputEl.value;
+                const errors = [];
+
+                if (/[\u0E00-\u0E7F\s]/.test(val)) {
+                    errors.push('ห้ามใส่ภาษาไทยหรือเว้นวรรคในรหัสผ่าน');
+                }
+                if (val.length < 8) {
+                    errors.push('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+                }
+                if (!/[A-Za-z]/.test(val)) {
+                    errors.push('ต้องมีตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว');
+                }
+                if (!/[0-9]/.test(val)) {
+                    errors.push('ต้องมีตัวเลขอย่างน้อย 1 ตัว');
+                }
+
+                if (errors.length > 0) {
+                    setFieldError(inputEl, errEl, errors.join('<br>'));
+                    return false;
+                }
+                setFieldError(inputEl, errEl, '');
+                return true;
+            }
+
+            function validateConfirmPassword(passEl, confirmEl, errId) {
+                const errEl = document.getElementById(errId);
+                const confirmVal = confirmEl.value;
+                if (!confirmVal) {
+                    setFieldError(confirmEl, errEl, 'กรุณากรอกยืนยันรหัสผ่าน');
+                    return false;
+                }
+                if (confirmVal !== passEl.value) {
+                    setFieldError(confirmEl, errEl, 'ยืนยันรหัสผ่านไม่ตรงกับรหัสผ่านที่ตั้งไว้');
+                    return false;
+                }
+                setFieldError(confirmEl, errEl, '');
+                return true;
+            }
+
+            attachAlphaNumOnlyFilter(loginUsername, document.getElementById('loginUsernameErr'), () => validateUsername(loginUsername, 'loginUsernameErr'));
+            loginUsername.addEventListener('blur', () => validateUsername(loginUsername, 'loginUsernameErr'));
+
+            attachNoThaiFilter(loginPassword, document.getElementById('loginPasswordErr'), 'รหัสผ่านห้ามใส่ภาษาไทย', () => {
+                if (loginPassword.value) setFieldError(loginPassword, document.getElementById('loginPasswordErr'), '');
+            });
+
+            attachThaiOnlyFilter(regFullName, document.getElementById('regFullNameErr'));
+            regFullName.addEventListener('blur', () => {
+                validateFullName();
+                checkRegisterAllValidSilently();
+            });
+
+            attachAlphaNumOnlyFilter(
+                regUsername,
+                document.getElementById('regUsernameErr'),
+                () => validateUsername(regUsername, 'regUsernameErr'),
+                checkRegisterAllValidSilently
+            );
+            regUsername.addEventListener('blur', () => {
+                validateUsername(regUsername, 'regUsernameErr');
+                checkRegisterAllValidSilently();
+            });
+
+            attachNoThaiFilter(
+                regEmail,
+                document.getElementById('regEmailErr'),
+                'อีเมลห้ามใส่ภาษาไทย',
+                () => {
+                    if (document.getElementById('regEmailErr').textContent && isRealEmailDomain(regEmail.value)) {
+                        setFieldError(regEmail, document.getElementById('regEmailErr'), '');
+                    }
+                },
+                checkRegisterAllValidSilently
+            );
+            regEmail.addEventListener('blur', () => {
+                validateEmailField(regEmail, 'regEmailErr');
+                checkRegisterAllValidSilently();
+            });
+
+            attachDigitsOnlyFilter(
+                regVerifyCode,
+                document.getElementById('regVerifyCodeErr'),
+                validateRegisterVerifyCode,
+                checkRegisterAllValidSilently
+            );
+            regVerifyCode.addEventListener('blur', () => {
+                validateRegisterVerifyCode();
+                checkRegisterAllValidSilently();
+            });
+
+            function startRegOtpCooldown(seconds = 60) {
+                if (regOtpCooldownTimer) clearInterval(regOtpCooldownTimer);
+                let left = seconds;
+                sendRegCodeBtn.disabled = true;
+                sendRegCodeBtn.textContent = `ส่งอีกครั้ง (${left}s)`;
+
+                regOtpCooldownTimer = setInterval(() => {
+                    left--;
+                    if (left <= 0) {
+                        clearInterval(regOtpCooldownTimer);
+                        regOtpCooldownTimer = null;
+                        sendRegCodeBtn.disabled = false;
+                        sendRegCodeBtn.textContent = 'ส่งรหัสยืนยัน';
+                    } else {
+                        sendRegCodeBtn.textContent = `ส่งอีกครั้ง (${left}s)`;
+                    }
+                }, 1000);
+            }
+
+            sendRegCodeBtn.addEventListener('click', async () => {
+                if (!validateEmailField(regEmail, 'regEmailErr')) {
+                    regEmail.focus();
+                    return;
+                }
+                const emailVal = regEmail.value.trim().toLowerCase();
+                const fullNameVal = regFullName.value.trim().replace(/\s+/g, ' ');
+
+                regOtpSentMsg.style.color = '#475569';
+                regOtpSentMsg.textContent = 'กำลังส่งรหัสยืนยัน 6 หลักไปยังอีเมล...';
+                sendRegCodeBtn.disabled = true;
+
+                try {
+                    const res = await DEIAuth.sendRegisterCode(emailVal, fullNameVal);
+                    if (res.success) {
+                        regOtpSentMsg.style.color = '#16a34a';
+                        regOtpSentMsg.textContent = res.previewCode
+                            ? `${res.message} (รหัสทดสอบ: ${res.previewCode})`
+                            : res.message;
+                        if (res.previewCode && !regVerifyCode.value) {
+                            regVerifyCode.value = res.previewCode;
+                            validateRegisterVerifyCode();
+                            checkRegisterAllValidSilently();
+                        }
+                        startRegOtpCooldown(60);
+                    } else {
+                        regOtpSentMsg.style.color = '#dc2626';
+                        regOtpSentMsg.textContent = res.message || 'ส่งรหัสยืนยันไม่สำเร็จ';
+                        sendRegCodeBtn.disabled = false;
+                    }
+                } catch (err) {
+                    regOtpSentMsg.style.color = '#dc2626';
+                    regOtpSentMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                    sendRegCodeBtn.disabled = false;
+                }
+            });
+
+            attachNoThaiFilter(
+                regPassword,
+                document.getElementById('regPasswordErr'),
+                'รหัสผ่านห้ามใส่ภาษาไทย',
+                () => {
+                    validateStrongPassword(regPassword, 'regPasswordErr');
+                    if (regConfirmPassword.value) {
+                        validateConfirmPassword(regPassword, regConfirmPassword, 'regConfirmPasswordErr');
+                    }
+                },
+                checkRegisterAllValidSilently
+            );
+            regPassword.addEventListener('blur', () => {
+                validateStrongPassword(regPassword, 'regPasswordErr');
+                checkRegisterAllValidSilently();
+            });
+
+            attachNoThaiFilter(
+                regConfirmPassword,
+                document.getElementById('regConfirmPasswordErr'),
+                'รหัสผ่านห้ามใส่ภาษาไทย',
+                () => {
+                    validateConfirmPassword(regPassword, regConfirmPassword, 'regConfirmPasswordErr');
+                },
+                checkRegisterAllValidSilently
+            );
+            regConfirmPassword.addEventListener('blur', () => {
+                validateConfirmPassword(regPassword, regConfirmPassword, 'regConfirmPasswordErr');
+                checkRegisterAllValidSilently();
+            });
+
+            attachNoThaiFilter(forgotEmail, document.getElementById('forgotEmailErr'), 'อีเมลห้ามใส่ภาษาไทย', () => {
+                if (document.getElementById('forgotEmailErr').textContent && isRealEmailDomain(forgotEmail.value)) {
+                    setFieldError(forgotEmail, document.getElementById('forgotEmailErr'), '');
+                }
+            });
+            forgotEmail.addEventListener('blur', () => validateEmailField(forgotEmail, 'forgotEmailErr'));
+
+            attachNoThaiFilter(newPasswordInput, document.getElementById('newPasswordErr'), 'รหัสผ่านห้ามใส่ภาษาไทย', () => {
+                validateStrongPassword(newPasswordInput, 'newPasswordErr');
+                if (confirmPasswordInput.value) {
+                    validateConfirmPassword(newPasswordInput, confirmPasswordInput, 'confirmPasswordErr');
+                }
+            });
+            newPasswordInput.addEventListener('blur', () => validateStrongPassword(newPasswordInput, 'newPasswordErr'));
+
+            attachNoThaiFilter(confirmPasswordInput, document.getElementById('confirmPasswordErr'), 'รหัสผ่านห้ามใส่ภาษาไทย', () => {
+                validateConfirmPassword(newPasswordInput, confirmPasswordInput, 'confirmPasswordErr');
+            });
+            confirmPasswordInput.addEventListener('blur', () => validateConfirmPassword(newPasswordInput, confirmPasswordInput, 'confirmPasswordErr'));
+
+            function stopWaitingTimers() {
+                if (approvalPollTimer) clearInterval(approvalPollTimer);
+                if (approvalElapsedTimer) clearInterval(approvalElapsedTimer);
+                approvalPollTimer = null;
+                approvalElapsedTimer = null;
+            }
+
+            function clearAllFieldErrors() {
+                document.querySelectorAll('.field-error-text').forEach(el => { el.innerHTML = ''; });
+                document.querySelectorAll('.form-control.is-invalid').forEach(el => { el.classList.remove('is-invalid'); });
+                regOtpSentMsg.textContent = '';
+            }
+
+            function showView(mode) {
+                stopWaitingTimers();
+                clearAllFieldErrors();
+                loginForm.classList.add('hidden');
+                registerForm.classList.add('hidden');
+                waitingApprovalView.classList.add('hidden');
+                forgotForm.classList.add('hidden');
+                resetPasswordForm.classList.add('hidden');
+
+                loginMsg.textContent = '';
+                registerMsg.textContent = '';
+                sendCodeMsg.textContent = '';
+                forgotErrorMsg.textContent = '';
+                resetPasswordMsg.textContent = '';
+
+                if (mode === 'login') {
+                    authTabsBox.classList.remove('hidden');
+                    tabLoginBtn.classList.add('active');
+                    tabRegisterBtn.classList.remove('active');
+                    authTitle.textContent = 'เข้าสู่ระบบ';
+                    authSubtitle.textContent = 'กรอกชื่อผู้ใช้งานและรหัสผ่านเพื่อเข้าใช้งานระบบ';
+                    loginForm.classList.remove('hidden');
+                } else if (mode === 'register') {
+                    authTabsBox.classList.remove('hidden');
+                    tabRegisterBtn.classList.add('active');
+                    tabLoginBtn.classList.remove('active');
+                    authTitle.textContent = 'สมัครสมาชิก';
+                    authSubtitle.textContent = 'กรอกข้อมูลผู้ใช้งานให้ครบตรงตามเงื่อนไข';
+                    registerForm.classList.remove('hidden');
+                    checkRegisterAllValidSilently();
+                } else if (mode === 'waiting') {
+                    authTabsBox.classList.add('hidden');
+                    authTitle.textContent = 'รอผู้ดูแลระบบอนุมัติ';
+                    authSubtitle.textContent = 'กรุณารอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที';
+                    waitingApprovalView.classList.remove('hidden');
+                } else if (mode === 'forgot') {
+                    authTabsBox.classList.add('hidden');
+                    authTitle.textContent = 'ลืมรหัสผ่าน';
+                    authSubtitle.textContent = 'ใส่อีเมลเพื่อรับรหัสยืนยัน และกรอกรหัสยืนยันที่ได้รับ';
+                    forgotForm.classList.remove('hidden');
+                } else if (mode === 'reset') {
+                    authTabsBox.classList.add('hidden');
+                    authTitle.textContent = 'ตั้งรหัสผ่านใหม่';
+                    authSubtitle.textContent = 'กรอกรหัสผ่านใหม่และยืนยันรหัสผ่านใหม่อีกครั้ง';
+                    resetPasswordForm.classList.remove('hidden');
+                }
+            }
+
+            function startWaitingForApproval(registeredUser) {
+                showView('waiting');
+                let seconds = 0;
+                waitingElapsedText.textContent = 'รอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที (0:00)';
+
+                approvalElapsedTimer = setInterval(() => {
+                    seconds++;
+                    const mins = Math.floor(seconds / 60);
+                    const secs = String(seconds % 60).padStart(2, '0');
+                    waitingElapsedText.textContent = `รอผู้ดูแลระบบอนุมัติประมาณ 1-2 นาที (${mins}:${secs})`;
+                }, 1000);
+
+                approvalPollTimer = setInterval(async () => {
+                    try {
+                        const query = new URLSearchParams({
+                            username: registeredUser.username || '',
+                            email: registeredUser.email || ''
+                        });
+                        const res = await fetch(`/api/auth/approval-status?${query.toString()}`);
+                        const data = await res.json();
+                        if (res.ok && data.success && data.approvalStatus === 'approved') {
+                            stopWaitingTimers();
+                            DEIAuth.setUser(data.user, true);
+                            waitingElapsedText.textContent = 'ได้รับการอนุมัติแล้ว! กำลังเข้าใช้งานระบบ...';
+                            setTimeout(() => {
+                                window.location.replace(DEIAuth.getHomePageByRole(data.user.role));
+                            }, 500);
+                        }
+                    } catch (err) {
+                        // รอรอบถัดไป
+                    }
+                }, 3000);
+            }
+
+            if (prefill && prefill.username) {
+                showView('login');
+                loginUsername.value = prefill.username;
+                loginPassword.value = prefill.password || '';
+                loginMsg.style.color = '#16a34a';
+                loginMsg.textContent = 'เปลี่ยนรหัสผ่านสำเร็จ! กรอก/ตรวจสอบข้อมูลแล้วกดเข้าสู่ระบบได้เลย';
+            }
+
+            tabLoginBtn.addEventListener('click', () => showView('login'));
+            tabRegisterBtn.addEventListener('click', () => showView('register'));
+            document.getElementById('goForgotBtn').addEventListener('click', () => showView('forgot'));
+            document.getElementById('backToLoginFromForgotBtn').addEventListener('click', () => showView('login'));
+            document.getElementById('backToLoginFromWaitingBtn').addEventListener('click', () => showView('login'));
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const okUser = validateUsername(loginUsername, 'loginUsernameErr');
+                const okPass = Boolean(loginPassword.value);
+                if (!okPass) {
+                    setFieldError(loginPassword, document.getElementById('loginPasswordErr'), 'กรุณากรอกรหัสผ่าน');
+                }
+                if (!okUser || !okPass) return;
+
+                loginMsg.style.color = '#475569';
+                loginMsg.textContent = 'กำลังตรวจสอบข้อมูล...';
+
+                try {
+                    const res = await DEIAuth.login(loginUsername.value.trim(), loginPassword.value);
+                    if (res.success && res.user) {
+                        loginMsg.style.color = '#16a34a';
+                        loginMsg.textContent = 'เข้าสู่ระบบสำเร็จ กำลังเข้าสู่หน้าหลัก...';
+                        setTimeout(() => {
+                            window.location.replace(DEIAuth.getHomePageByRole(res.user.role));
+                        }, 300);
+                    } else {
+                        loginMsg.style.color = '#dc2626';
+                        loginMsg.textContent = res.message || 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง';
+                    }
+                } catch (err) {
+                    loginMsg.style.color = '#dc2626';
+                    loginMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+
+            registerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                registerMsg.textContent = '';
+
+                const v1 = validateFullName();
+                const v2 = validateUsername(regUsername, 'regUsernameErr');
+                const v3 = validateEmailField(regEmail, 'regEmailErr');
+                const vCode = validateRegisterVerifyCode();
+                const v4 = validateStrongPassword(regPassword, 'regPasswordErr');
+                const v5 = validateConfirmPassword(regPassword, regConfirmPassword, 'regConfirmPasswordErr');
+
+                if (!v1 || !v2 || !v3 || !vCode || !v4 || !v5 || registerSubmitBtn.disabled) {
+                    registerSubmitBtn.disabled = true;
+                    registerMsg.style.color = '#dc2626';
+                    registerMsg.textContent = 'กรุณาแก้ไขช่องที่มีกรอบและตัวอักษรสีแดงให้ถูกต้องครบทุกช่องก่อนสมัครสมาชิก';
+                    return;
+                }
+
+                registerSubmitBtn.disabled = true;
+                registerMsg.style.color = '#475569';
+                registerMsg.textContent = 'กำลังบันทึกข้อมูลสมัครสมาชิก...';
+
+                const fullName = regFullName.value.trim().replace(/\s+/g, ' ');
+                const username = regUsername.value.trim();
+                const email = regEmail.value.trim().toLowerCase();
+                const verifyCode = regVerifyCode.value.trim();
+                const password = regPassword.value;
+                const role = document.getElementById('regRole').value;
+
+                try {
+                    const res = await DEIAuth.register({ fullName, username, email, verifyCode, password, role });
+                    if (res.success) {
+                        loginUsername.value = username;
+                        loginPassword.value = password;
+                        startWaitingForApproval({ username, email });
+                    } else {
+                        registerMsg.style.color = '#dc2626';
+                        registerMsg.textContent = res.message || 'สมัครสมาชิกไม่สำเร็จ';
+                        checkRegisterAllValidSilently();
+                    }
+                } catch (err) {
+                    registerMsg.style.color = '#dc2626';
+                    registerMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                    checkRegisterAllValidSilently();
+                }
+            });
+
+            document.getElementById('sendCodeBtn').addEventListener('click', async () => {
+                if (!validateEmailField(forgotEmail, 'forgotEmailErr')) return;
+                const emailVal = forgotEmail.value.trim().toLowerCase();
+
+                sendCodeMsg.style.color = '#475569';
+                sendCodeMsg.textContent = 'กำลังส่งรหัสยืนยันไปยังอีเมล...';
+                codePreviewBox.classList.add('hidden');
+
+                try {
+                    const res = await DEIAuth.requestResetCode(emailVal);
+                    if (res.success) {
+                        sendCodeMsg.style.color = '#16a34a';
+                        sendCodeMsg.textContent = res.message;
+                        if (res.previewCode) {
+                            codePreviewBox.classList.remove('hidden');
+                            codePreviewBox.innerHTML = `รหัสยืนยันสำหรับทดสอบ: <strong>${res.previewCode}</strong>`;
+                            document.getElementById('verifyCodeInput').value = res.previewCode;
+                        }
+                    } else {
+                        sendCodeMsg.style.color = '#dc2626';
+                        sendCodeMsg.textContent = res.message || 'ไม่พบอีเมลนี้ในระบบ';
+                    }
+                } catch (err) {
+                    sendCodeMsg.style.color = '#dc2626';
+                    sendCodeMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+
+            forgotForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (!validateEmailField(forgotEmail, 'forgotEmailErr')) return;
+                const emailVal = forgotEmail.value.trim().toLowerCase();
+                const codeVal = document.getElementById('verifyCodeInput').value.trim();
+
+                if (!codeVal) {
+                    forgotErrorMsg.style.color = '#dc2626';
+                    forgotErrorMsg.textContent = 'กรุณากรอกรหัสยืนยันที่ได้รับทางอีเมล';
+                    return;
+                }
+
+                verifiedEmail = emailVal;
+                verifiedCode = codeVal;
+                newPasswordInput.value = '';
+                confirmPasswordInput.value = '';
+                showView('reset');
+            });
+
+            resetPasswordForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const okNewPass = validateStrongPassword(newPasswordInput, 'newPasswordErr');
+                const okConfirm = validateConfirmPassword(newPasswordInput, confirmPasswordInput, 'confirmPasswordErr');
+                if (!okNewPass || !okConfirm) return;
+
+                resetPasswordMsg.style.color = '#475569';
+                resetPasswordMsg.textContent = 'กำลังบันทึกรหัสผ่านใหม่...';
+
+                try {
+                    const res = await DEIAuth.confirmNewPassword(verifiedEmail, verifiedCode, newPasswordInput.value);
+                    if (res.success) {
+                        DEIAuth.setPrefillLogin(res.username, res.password);
+                        resetPasswordMsg.style.color = '#16a34a';
+                        resetPasswordMsg.textContent = 'ยืนยันรหัสผ่านใหม่สำเร็จ! กำลังกลับไปหน้าเข้าสู่ระบบ...';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 600);
+                    } else {
+                        resetPasswordMsg.style.color = '#dc2626';
+                        resetPasswordMsg.textContent = res.message || 'ไม่สามารถเปลี่ยนรหัสผ่านได้';
+                    }
+                } catch (err) {
+                    resetPasswordMsg.style.color = '#dc2626';
+                    resetPasswordMsg.textContent = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+                }
+            });
+        })();
     </script>
 </body>
 </html>
